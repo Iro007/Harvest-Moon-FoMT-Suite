@@ -3,6 +3,7 @@
 # "Actualización La Imposibilidad"
 # Desarrollado por: Denisovich728
 # ============================================================
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Union
 from enum import Enum, auto
