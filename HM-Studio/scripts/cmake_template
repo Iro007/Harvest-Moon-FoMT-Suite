@@ -1,0 +1,80 @@
+#Require a minimum version
+cmake_minimum_required(VERSION 3.10)
+
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
+set (CMAKE_CXX_STANDARD 17)
+
+#Set project name
+project(HMStudio)
+
+#Don't try to search under Windows
+if(WIN32)
+	#wxWidgets
+	if(DEFINED ENV{WXWIN})		
+		message(STATUS "Found wxWidgets: $ENV{WXWIN}")
+		
+		# wxWidgets include directory
+		include_directories("$ENV{WXWIN}\\include")
+		include_directories("$ENV{WXWIN}\\include\\msvc")
+		# wxWidgets library folder
+		link_directories("$ENV{WXWIN}\\lib\\vc_lib")
+	endif()
+	if(DEFINED ENV{HUNSPELL})
+		message(STATUS "Found Hunspell: $ENV{HUNSPELL}")
+		
+		# hunspell include directory
+		include_directories("$ENV{HUNSPELL}\\src")
+		# hunspell library folder
+		link_directories("$ENV{Hunspell}\\msvc\\${CMAKE_BUILD_TYPE}\\libhunspell")		
+		
+		# enable Hunspell
+		add_definitions(-DENABLE_SPELL)
+	endif()
+
+	# Set characters to Unicode
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /UMBCS /D_UNICODE /DUNICODE")
+			
+	# Group ALL_BUILD and ZERO_CHECK in one folder
+	set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+	# Set HMStudio as the startup project
+	set_property (DIRECTORY PROPERTY VS_STARTUP_PROJECT "HMStudio")
+	# Disable these annoying warnings
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+else()
+	#wxWidgets
+	find_package(wxWidgets REQUIRED COMPONENTS net core base xml stc)
+	include(${wxWidgets_USE_FILE})
+	
+	find_package(hunspell)
+	
+	if(DEFINED HUNSPELL_FOUND)
+		# hunspell include directory
+		include_directories(${HUNSPELL_INCLUDE_DIR})
+		# enable Hunspell
+		add_definitions(-DENABLE_SPELL)
+	endif(DEFINED HUNSPELL_FOUND)	
+endif()
+
+include_directories(include)
+
+SET(SRC
+	#SRC HERE
+)
+
+SET(HDR
+	#HDR HERE
+)
+
+if(WIN32)
+	add_executable(HMStudio WIN32 ${SRC} ${HDR})	
+	
+	target_link_libraries(HMStudio libhunspell)
+else()
+	add_executable(HMStudio ${SRC} ${HDR})	
+	
+	target_link_libraries(HMStudio ${wxWidgets_LIBRARIES})
+	
+	if(DEFINED HUNSPELL_FOUND)
+		target_link_libraries(HMStudio ${HUNSPELL_LIBRARIES})
+	endif()	
+endif()

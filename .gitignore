@@ -1,0 +1,55 @@
+# ============================================================================
+# EXCLUSIÓN ESTRICTA DE ROMS Y BINARIOS CON COPYRIGHT (NO SUBIR A GIT)
+# ============================================================================
+*.gba
+*.GBA
+*.nds
+*.NDS
+*.gb
+*.gbc
+*.srm
+*.sav
+*.SAV
+*.sgm
+*.elf
+*.mb
+baserom.gba
+fomt.gba
+fomt.elf
+Harvest Moon*.gba
+
+# ============================================================================
+# ARTEFACTOS DE COMPILACIÓN C/C++ (StanHash_fomt / HM-Studio)
+# ============================================================================
+*.o
+*.d
+*.a
+*.exe
+*.dll
+*.so
+*.dylib
+StanHash_fomt/build/
+StanHash_fomt/tools/agbcc/
+
+# ============================================================================
+# ENTORNOS VIRTUALES Y CACHÉ DE PYTHON (FOMT_Studio)
+# ============================================================================
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.cache/
+FOMT_Studio/**/.cache/
+FOMT_Studio/**/temp_preview.*
+
+# ============================================================================
+# COMPILACIÓN RUST (StanHash_mary)
+# ============================================================================
+StanHash_mary/target/
+
+# ============================================================================
+# VOLCADOS CRUDOS DE FRAMES JSON (>500 MB) - Se conserva animations_catalog.json
+# ============================================================================
+FIO-DECOMP-HMFOMT/assets/animations/anim_*.json
