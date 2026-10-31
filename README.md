@@ -1,6 +1,8 @@
-# Harvest Moon: Friends of Mineral Town (GBA) — Ecosistema de Decompilación, Ingeniería Inversa y ROM Hacking
+﻿# Harvest Moon: Friends of Mineral Town (GBA) — Ecosistema de Decompilación, Ingeniería Inversa y ROM Hacking
 
 Este repositorio unifica los proyectos clave de decompilación, análisis de bytecode y herramientas gráficas de modificación para **Harvest Moon: Friends of Mineral Town (USA)** de Game Boy Advance (`HARVESTMOGBAA4NE`), **excluyendo cualquier archivo ROM propietario (`.gba`)**.
+
+> **¿Eres principiante? Lee la [Guía para principiantes](./GUIA_PRINCIPIANTES.md).**
 
 ---
 
