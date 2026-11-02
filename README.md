@@ -6,6 +6,34 @@ Este repositorio unifica los proyectos clave de decompilación, análisis de byt
 
 ---
 
+## FoMT Suite (HTML, sin instalar nada)
+
+Abre **[`FoMT_Suite.html`](./FoMT_Suite.html)** con doble clic (Chrome, Edge o Firefox). Abres la ROM **una sola vez** y todas las herramientas la usan; cuando una inyecta cambios, esa ROM pasa a ser la «ROM de trabajo» y puedes seguir con las demás o descargarla.
+
+| Herramienta | Archivo | Qué hace |
+| :--- | :--- | :--- |
+| **Mapas** | [`herramientas/mapas.html`](./herramientas/mapas.html) | Capas 0–2 y **capa 3 de edificios/muebles** (los parches que el juego pega según lo comprado), colisión, **warps con su destino real**, bloques 16×16 de 3 capas al estilo Advance Map, piezas (capturar por capas, edificios, PNG importados), tiles nuevos, **mapas nuevos**, exportar PNG e inyectar en la ROM (ampliada a 32 MB). |
+| **Textos, NPC y retratos** | [`herramientas/textos_npc.html`](./herramientas/textos_npc.html) | Traducción de diálogos, eventos nuevos, hablantes, retratos e importación de retratos desde imágenes; genera ROM e IPS. |
+| **Audio** | [`herramientas/audio.html`](./herramientas/audio.html) | Música y efectos de **FoMT (motor m4a/Sappy de GBA)** y de Harvest Moon DS (SDAT): reproducir, silenciar/solo por pista, velocidad, transposición, exportar WAV y MIDI, escuchar las muestras. |
+
+Cada herramienta también funciona sola. Se comunican con la suite por `postMessage` a través de [`herramientas/fomt-hub.js`](./herramientas/fomt-hub.js), así que no hace falta servidor ni compilar nada. Para añadir una herramienta nueva: crea su HTML en `herramientas/`, incluye `fomt-hub.js`, llama a `FomtHub.onRom(...)` para recibir la ROM y a `FomtHub.publish(...)` tras inyectar, y añádela a `TOOLS` en `FoMT_Suite.html`.
+
+### Datos de la ROM que usan las herramientas
+
+| Dato | Offset (USA) | Notas |
+| :--- | :--- | :--- |
+| Tabla de mapas | `0x105EDC` | 66 entradas de 40 bytes; única referencia en el literal `0x0A46A8` (`GetMapData`), por eso se puede reubicar para añadir mapas. |
+| Tabla de parches (edificios y muebles) | `0x10692C` | 82 entradas de 24 bytes (ancho, alto, 3 capas u16 sin comprimir, tipos y rejilla de colisión). El mapa de cada parche sale de la tabla de saltos por mapa en `0x080A685C`. |
+| Colisión → scripts | — | Campo «evento» = nº de script (salidas); campo «objeto» ÷ 2 = nº de script (puertas). El destino es el `Warp_Player(escena, x, y)` de ese script. |
+| Tabla de canciones m4a | `0x13ABF0` | 211 entradas (`gSongTable` en la decomp de StanHash). Reproductor 0 = música; el resto, efectos. |
+
+### Pendiente
+- Editar el destino de un warp (requiere recompilar el script) y que una escena cargue un mapa nuevo.
+- NPC: añadir NPC y retratos nuevos, visor de sprites con las 4 poses animadas y sprites nuevos; capa de NPC y rutas en el editor de mapas.
+- Audio: añadir canciones y efectos nuevos (MIDI → m4a; `FOMT_Studio` ya tiene un compilador MIDI → Sappy en Python).
+
+---
+
 ## Estructura del Repositorio y Genealogía Técnica
 
 | Carpeta | Proyecto Base | Lenguaje | Propósito dentro del Ecosistema |

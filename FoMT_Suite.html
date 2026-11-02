@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoMT Suite</title>
+<style>
+:root{
+  --bg:#f2f4f1; --panel:#ffffff; --panel-2:#e8ece6; --line:#cfd6cb; --fg:#1c2420; --muted:#5b675f;
+  --accent:#0f766e; --accent-fg:#ffffff; --warn:#b4561b; --warnbg:#fbeadd;
+  --font:"Segoe UI",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131815; --panel:#1b221e; --panel-2:#252e29; --line:#34403a; --fg:#e4ebe6; --muted:#98a79d;
+    --accent:#2dd4bf; --accent-fg:#06201c; --warn:#f0a06a; --warnbg:#3b2a1e;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131815; --panel:#1b221e; --panel-2:#252e29; --line:#34403a; --fg:#e4ebe6; --muted:#98a79d;
+  --accent:#2dd4bf; --accent-fg:#06201c; --warn:#f0a06a; --warnbg:#3b2a1e;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--font);display:grid;grid-template-rows:auto auto 1fr;overflow:hidden}
+header{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:15px;margin:0 6px 0 0}
+nav{display:flex;gap:4px}
+button{font:inherit;color:inherit;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:5px 11px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+button.on,button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.grow{flex:1}
+#romst{color:var(--muted);font-size:12px}
+#banner{display:none;align-items:center;gap:10px;padding:6px 14px;background:var(--warnbg);color:var(--fg);border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+#banner.show{display:flex}
+#frames{position:relative;min-height:0}
+#frames iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg);display:none}
+#frames iframe.on{display:block}
+#home{position:absolute;inset:0;overflow:auto;padding:28px 16px}
+#home .wrap{max-width:860px;margin:0 auto}
+#home h2{font-size:20px;margin:0 0 6px}
+#home p{color:var(--muted);margin:0 0 18px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;text-align:left;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.card b{font-size:15px}.card span{color:var(--muted);font-size:13px}
+@media (max-width:640px){header{gap:8px}nav{width:100%;overflow-x:auto}}
+</style>
+</head>
+<body>
+<header>
+  <h1>FoMT Suite</h1>
+  <nav aria-label="Herramientas">
+    <button data-tool="home" class="on">Inicio</button>
+    <button data-tool="mapas">Mapas</button>
+    <button data-tool="textos">Textos, NPC y retratos</button>
+    <button data-tool="audio">Audio</button>
+  </nav>
+  <span class="grow"></span>
+  <span id="romst">Sin ROM</span>
+  <button id="romBtn" class="primary">Abrir ROM…</button>
+  <button id="dlBtn" disabled title="Descarga la ROM de trabajo (con las ediciones inyectadas por las herramientas)">Descargar ROM de trabajo</button>
+  <input type="file" id="romFile" accept=".gba,.bin" hidden>
+</header>
+<div id="banner" role="status"><span id="bannerText"></span><button id="bannerSend">Enviar a las demás herramientas</button><button id="bannerClose">Ignorar</button></div>
+<div id="frames">
+  <div id="home"><div class="wrap">
+    <h2>Herramientas de ROM hacking para Harvest Moon: Friends of Mineral Town</h2>
+    <p>Abre tu ROM una vez y todas las herramientas la usan. Cuando una herramienta inyecta cambios, esa ROM pasa a ser la «ROM de trabajo» y puedes seguir editándola con las demás.</p>
+    <div class="cards">
+      <button class="card" data-tool="mapas"><b>Mapas</b><span>Capas 0–2, edificios y muebles (capa 3), colisión, warps con su destino, bloques 16×16, piezas, tiles nuevos, mapas nuevos y PNG.</span></button>
+      <button class="card" data-tool="textos"><b>Textos, NPC y retratos</b><span>Traducción de diálogos, eventos nuevos, hablantes, retratos e importación de imágenes de retrato.</span></button>
+      <button class="card" data-tool="audio"><b>Audio</b><span>Música y efectos de FoMT (motor m4a de GBA) y de Harvest Moon DS: reproducir, silenciar pistas, exportar WAV y MIDI.</span></button>
+    </div>
+  </div></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var TOOLS = { mapas: 'herramientas/mapas.html', textos: 'herramientas/textos_npc.html', audio: 'herramientas/audio.html' };
+  var NAMES = { mapas: 'Mapas', textos: 'Textos, NPC y retratos', audio: 'Audio' };
+  var frames = {}, ready = {}, rom = null, romName = '', sent = {}, current = 'home';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function status() {
+    $('romst').textContent = rom ? romName + ' · ' + (rom.length / 1048576).toFixed(rom.length % 1048576 ? 1 : 0) + ' MB' : 'Sin ROM';
+    $('dlBtn').disabled = !rom;
+  }
+  function send(tool) {
+    var f = frames[tool];
+    if (!rom || !f || !ready[tool] || sent[tool] === rom) return;
+    sent[tool] = rom;
+    f.contentWindow.postMessage({ type: 'fomt-rom', name: romName, bytes: rom }, '*');
+  }
+  function setRom(bytes, name, from) {
+    rom = bytes; romName = name; status();
+    Object.keys(frames).forEach(function (t) { if (t !== from) send(t); });
+    if (from) sent[from] = rom;
+    try { save(); } catch (e) {}
+  }
+  function show(tool) {
+    current = tool;
+    document.querySelectorAll('nav button').forEach(function (b) { b.classList.toggle('on', b.dataset.tool === tool); });
+    $('home').style.display = tool === 'home' ? 'block' : 'none';
+    if (tool !== 'home' && !frames[tool]) {
+      var f = document.createElement('iframe');
+      f.title = NAMES[tool]; f.src = TOOLS[tool];
+      $('frames').appendChild(f); frames[tool] = f;
+    }
+    Object.keys(frames).forEach(function (t) { frames[t].classList.toggle('on', t === tool); });
+  }
+
+  window.addEventListener('message', function (e) {
+    var d = e.data, tool = Object.keys(frames).filter(function (t) { return frames[t].contentWindow === e.source; })[0];
+    if (!d || !tool) return;
+    if (d.type === 'fomt-ready') { ready[tool] = true; send(tool); }
+    if (d.type === 'fomt-rom-out' && d.bytes) {
+      rom = new Uint8Array(d.bytes); romName = d.name || romName; sent[tool] = rom; status();
+      try { save(); } catch (err) {}
+      var others = Object.keys(frames).filter(function (t) { return t !== tool; });
+      $('bannerText').textContent = NAMES[tool] + ' generó una ROM nueva: ahora es la ROM de trabajo.' + (others.length ? ' Las demás herramientas siguen con la anterior hasta que se la envíes (perderían cambios sin inyectar).' : '');
+      $('bannerSend').hidden = !others.length;
+      $('banner').classList.add('show');
+    }
+  });
+
+  document.querySelectorAll('[data-tool]').forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.tool); }); });
+  $('romBtn').addEventListener('click', function () { $('romFile').click(); });
+  $('romFile').addEventListener('change', function (e) {
+    var f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    f.arrayBuffer().then(function (buf) { setRom(new Uint8Array(buf), f.name, null); if (current === 'home') show('mapas'); });
+  });
+  $('bannerSend').addEventListener('click', function () {
+    Object.keys(frames).forEach(function (t) { send(t); });
+    $('banner').classList.remove('show');
+  });
+  $('bannerClose').addEventListener('click', function () { $('banner').classList.remove('show'); });
+  $('dlBtn').addEventListener('click', function () {
+    if (!rom) return;
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([rom], { type: 'application/octet-stream' }));
+    a.download = /\.gba$/i.test(romName) ? romName : romName + '.gba';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  // Recuerda la última ROM de trabajo en este navegador (IndexedDB) para no abrirla cada vez.
+  function db(mode, fn) {
+    return new Promise(function (ok, fail) {
+      var rq = indexedDB.open('fomt-suite', 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('rom'); };
+      rq.onerror = function () { fail(rq.error); };
+      rq.onsuccess = function () { var tx = rq.result.transaction('rom', mode), r = fn(tx.objectStore('rom')); tx.oncomplete = function () { ok(r && r.result); }; tx.onerror = function () { fail(tx.error); }; };
+    });
+  }
+  function save() { return db('readwrite', function (s) { return s.put({ name: romName, bytes: rom }, 'work'); }).catch(function () {}); }
+  try {
+    db('readonly', function (s) { return s.get('work'); }).then(function (v) { if (v && v.bytes && !rom) setRom(new Uint8Array(v.bytes), v.name, null); }, function () {});
+  } catch (e) {}
+  status();
+})();
+</script>
+</body>
+</html>
