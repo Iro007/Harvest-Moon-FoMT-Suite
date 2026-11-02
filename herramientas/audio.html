@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HM-Studio · Editor de OST y SFX</title>
+<style>
+:root{
+  --bg:#14171a; --panel:#1b1f23; --panel2:#22272c; --line:#2f353b;
+  --ink:#e6e3dc; --mute:#8b9298; --acc:#5fc4b0; --acc2:#e0b45a; --bad:#e07a6a;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,monospace;
+  --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);display:flex;flex-direction:column;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+header h1{font-size:15px;margin:0;font-weight:650}
+header .sub{color:var(--mute);font-size:12px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--acc)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--acc);color:#0c1613;border-color:var(--acc);font-weight:600}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc2);outline-offset:1px}
+main{flex:1;display:grid;grid-template-columns:300px 1fr 310px;min-height:0}
+.col{overflow:auto;min-height:0;background:var(--panel)}
+.col.l{border-right:1px solid var(--line)} .col.r{border-left:1px solid var(--line)}
+.tabs{display:flex;position:sticky;top:0;background:var(--panel);z-index:2;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:9px 4px;cursor:pointer;color:var(--mute)}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--acc)}
+.search{padding:8px 10px;border-bottom:1px solid var(--line);position:sticky;top:37px;background:var(--panel);z-index:2}
+.search input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.item{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:6px 12px;cursor:pointer}
+.item:hover{background:var(--panel2)} .item.on{background:var(--panel2);border-left-color:var(--acc)}
+.item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item small{color:var(--mute);font-family:var(--mono);font-size:11px;white-space:nowrap}
+.sub-item{padding-left:26px}
+.empty{padding:28px 18px;color:var(--mute)} .empty strong{color:var(--ink)}
+#stage{display:flex;flex-direction:column;min-width:0}
+#transport{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+#ttl{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#time{font-family:var(--mono);font-size:12px;color:var(--mute);white-space:nowrap}
+#seek{flex:1;accent-color:var(--acc);min-width:80px}
+#roll-wrap{flex:1;min-height:0;position:relative;background:#101316}
+#roll{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+#prog{position:absolute;left:0;top:0;height:3px;background:var(--acc);width:0;transition:width .1s}
+#status{padding:8px 14px;font-size:12px;color:var(--mute);border-top:1px solid var(--line);background:var(--panel)}
+#status b{color:var(--acc)}
+.field{padding:10px 12px;border-bottom:1px solid var(--line)}
+.field label{display:block;color:var(--mute);font-size:12px;margin-bottom:4px}
+.field select,.field input[type=number]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.field input[type=range]{width:100%;accent-color:var(--acc)}
+.row{display:flex;gap:8px}.row>*{flex:1}
+h2{font-size:12px;font-weight:600;color:var(--mute);margin:0;padding:10px 12px;border-bottom:1px solid var(--line)}
+.trk{display:grid;grid-template-columns:10px 1fr auto auto;gap:6px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line)}
+.trk i{width:10px;height:10px;border-radius:2px;display:block}
+.trk .n{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trk .n small{display:block;color:var(--mute);font-size:11px}
+.mini{width:26px;height:24px;padding:0;border-radius:4px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:12px}
+.mini.on.m{background:var(--bad);color:#1b0b08;border-color:var(--bad)}
+.mini.on.s{background:var(--acc2);color:#1c1403;border-color:var(--acc2)}
+.trk input[type=range]{grid-column:2 / 5;accent-color:var(--acc);height:14px}
+.note{padding:10px 12px;color:var(--mute);font-size:12px}
+@media(max-width:1000px){main{grid-template-columns:220px 1fr}.col.r{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>HM-Studio · Editor de OST y SFX</h1><div class="sub">Harvest Moon DS — secuencias SSEQ, bancos y ondas leídos de la ROM real</div></div>
+  <div style="flex:1"></div>
+  <label class="btn primary" for="rom-in">Abrir ROM (.nds o .zip)</label>
+  <input id="rom-in" type="file" accept=".nds,.zip" hidden>
+</header>
+<main>
+  <section class="col l" aria-label="Lista de sonidos">
+    <div class="tabs" role="tablist">
+      <button class="on" data-tab="bgm">Música</button><button data-tab="se">Efectos</button><button data-tab="strm">Stream</button><button data-tab="wave">Muestras</button>
+    </div>
+    <div class="search"><input id="q" type="search" placeholder="Buscar…" aria-label="Buscar"></div>
+    <div id="list"><div class="empty"><strong>Abre la ROM</strong> para listar las canciones (OST) y los efectos (SFX).</div></div>
+  </section>
+  <section id="stage">
+    <div id="transport">
+      <button class="btn" id="bplay" disabled>▶ Reproducir</button>
+      <button class="btn" id="bstop" disabled>■</button>
+      <span id="ttl">Sin selección</span>
+      <input id="seek" type="range" min="0" max="1000" value="0" disabled aria-label="Posición">
+      <span id="time">0:00 / 0:00</span>
+    </div>
+    <div id="roll-wrap"><div id="prog"></div><canvas id="roll"></canvas></div>
+    <div id="status">Esperando ROM.</div>
+  </section>
+  <section class="col r" aria-label="Ajustes y pistas">
+    <h2>Reproducción</h2>
+    <div class="field"><div class="row">
+      <div><label for="loops">Repeticiones del bucle</label><select id="loops"><option value="1">1 (intro + 1 vuelta)</option><option value="2">2</option><option value="3">3</option></select></div>
+      <div><label for="repeat">Al terminar</label><select id="repeat"><option value="0">Parar</option><option value="1">Repetir</option></select></div>
+    </div></div>
+    <div class="field"><label for="tempo">Velocidad: <b id="tempoV">×1.00</b></label><input id="tempo" type="range" min="50" max="200" value="100"></div>
+    <div class="field"><label for="trans">Transposición: <b id="transV">0</b> semitonos</label><input id="trans" type="range" min="-12" max="12" value="0"></div>
+    <div class="field"><label for="vol">Volumen</label><input id="vol" type="range" min="0" max="100" value="80"></div>
+    <h2>Pistas</h2>
+    <div id="tracks"><div class="note">Selecciona una canción para ver sus pistas (silenciar / solo / volumen).</div></div>
+    <h2>Exportar</h2>
+    <div class="field"><div class="row"><button class="btn" id="xwav" disabled>WAV</button><button class="btn" id="xmid" disabled>MIDI</button><button class="btn" id="xraw" disabled>SSEQ</button></div></div>
+    <div class="note">Se re-renderiza al cambiar velocidad, transposición, mute o solo. La envolvente, el vibrato y las notas PSG son aproximaciones del hardware real; el MIDI conserva notas, programas y tempo.</div>
+  </section>
+</main>
+
+<script>
+/* ===== Motor SDAT (Nitro Sound) ===== */
+const AE = (() => {
+const u16 = (b,o) => b[o] | b[o+1] << 8;
+const s16 = (b,o) => (b[o] | b[o+1] << 8) << 16 >> 16;
+const u32 = (b,o) => (b[o] | b[o+1] << 8 | b[o+2] << 16 | b[o+3] << 24) >>> 0;
+const cstr = (b,o) => { let e = o; while (b[e]) e++; let s = ""; for (let i = o; i < e; i++) s += String.fromCharCode(b[i]); return s; };
+
+/* ---------- SDAT ---------- */
+function parseSdat(b){
+  if (String.fromCharCode(b[0],b[1],b[2],b[3]) !== "SDAT") throw new Error("No es un SDAT");
+  const symbO = u32(b,0x10), infoO = u32(b,0x18), fatO = u32(b,0x20);
+  const sym = [], info = [];
+  for (let t = 0; t < 8; t++){
+    let lo = u32(b, symbO + 8 + t*4), names = [];
+    if (lo){ const n = u32(b, symbO + lo); if (t !== 1) for (let i = 0; i < n; i++){ const no = u32(b, symbO + lo + 4 + i*4); names.push(no ? cstr(b, symbO + no) : null); } }
+    sym.push(names);
+    lo = u32(b, infoO + 8 + t*4); const recs = [];
+    if (lo){ const n = u32(b, infoO + lo); for (let i = 0; i < n; i++){ const ro = u32(b, infoO + lo + 4 + i*4); recs.push(ro ? infoO + ro : 0); } }
+    info.push(recs);
+  }
+  const file = id => { const o = fatO + 12 + id*16, off = u32(b,o), sz = u32(b,o+4); return b.subarray(off, off + sz); };
+  const seqs = [], banks = [], wavearcs = [], strms = [];
+  info[0].forEach((r,i) => { if (r) seqs.push({ id:i, name:sym[0][i] || ("SEQ_" + i), fileId:u16(b,r), bank:u16(b,r+4), vol:b[r+6] }); });
+  info[2].forEach((r,i) => { banks[i] = r ? { name:sym[2][i], fileId:u16(b,r), wars:[u16(b,r+4),u16(b,r+6),u16(b,r+8),u16(b,r+10)] } : null; });
+  info[3].forEach((r,i) => { wavearcs[i] = r ? { name:sym[3][i], fileId:u16(b,r) } : null; });
+  info[7].forEach((r,i) => { if (r) strms.push({ id:i, name:sym[7][i] || ("STRM_" + i), fileId:u16(b,r) }); });
+  return { b, seqs, banks, wavearcs, strms, file };
+}
+
+/* ---------- SBNK ---------- */
+function parseBank(f){
+  const n = u32(f,0x38), recs = [];
+  for (let i = 0; i < n; i++) recs.push({ type:f[0x3c + i*4], off:u16(f, 0x3c + i*4 + 1) });
+  const ent = (o, hasType, t0) => { let p = o, t = t0; if (hasType){ t = u16(f,p); p += 2; } return { type:t, swav:u16(f,p), swar:u16(f,p+2), note:f[p+4], a:f[p+5], d:f[p+6], s:f[p+7], r:f[p+8], pan:f[p+9] }; };
+  return { count:n, get(prog, key){
+    const r = recs[prog]; if (!r || !r.type) return null;
+    if (r.type <= 3) return ent(r.off, false, r.type);
+    if (r.type === 16){ const lo = f[r.off], hi = f[r.off+1]; if (key < lo || key > hi) return null; return ent(r.off + 2 + (key - lo)*12, true); }
+    if (r.type === 17){ let i = 0; for (; i < 8; i++) if (key <= f[r.off + i]) break; if (i === 8) return null; return ent(r.off + 8 + i*12, true); }
+    return null;
+  } };
+}
+
+/* ---------- SWAR / ADPCM ---------- */
+const IDX = [-1,-1,-1,-1,2,4,6,8];
+const STEP = [7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,80,88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,494,544,598,658,724,796,876,963,1060,1166,1282,1411,1552,1707,1878,2066,2272,2499,2749,3024,3327,3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767];
+function adpcm(f, o, len){
+  let pred = s16(f,o), idx = Math.min(88, Math.max(0, u16(f,o+2) & 0x7f));
+  const n = (len - 4) * 2, out = new Float32Array(n);
+  for (let i = 0; i < n; i++){
+    const byte = f[o + 4 + (i >> 1)], nib = (i & 1) ? byte >> 4 : byte & 15, step = STEP[idx];
+    let diff = step >> 3; if (nib & 1) diff += step >> 2; if (nib & 2) diff += step >> 1; if (nib & 4) diff += step;
+    pred += (nib & 8) ? -diff : diff; if (pred > 32767) pred = 32767; else if (pred < -32768) pred = -32768;
+    idx += IDX[nib & 7]; if (idx < 0) idx = 0; else if (idx > 88) idx = 88;
+    out[i] = pred / 32768;
+  }
+  return out;
+}
+function parseSwar(f){
+  const n = u32(f,0x38), cache = [];
+  const wave = i => {
+    if (cache[i] !== undefined) return cache[i];
+    if (i >= n){ cache[i] = null; return null; }
+    const o = u32(f, 0x3c + i*4), type = f[o], loop = f[o+1], rate = u16(f,o+2), loopOff = u16(f,o+6), nonLoop = u32(f,o+8), d = o + 12;
+    const bytes = (loopOff + nonLoop) * 4; let pcm, ls, le;
+    if (type === 0){ pcm = new Float32Array(bytes); for (let k = 0; k < bytes; k++) pcm[k] = (f[d+k] << 24 >> 24) / 128; ls = loopOff * 4; }
+    else if (type === 1){ const c = bytes >> 1; pcm = new Float32Array(c); for (let k = 0; k < c; k++) pcm[k] = s16(f, d + k*2) / 32768; ls = loopOff * 2; }
+    else { pcm = adpcm(f, d, bytes); ls = (loopOff * 4 - 4) * 2; }
+    le = pcm.length;
+    cache[i] = { pcm, rate, loop:!!loop, loopStart:Math.max(0, ls), loopEnd:le, type };
+    return cache[i];
+  };
+  return { count:n, wave };
+}
+
+/* ---------- SSEQ: secuenciador ---------- */
+function simulate(sseq, o){
+  o = Object.assign({ loops:1, maxSec:240, tempoScale:1 }, o || {});
+  const d = sseq.subarray(u32(sseq,0x18)), vars = new Int16Array(32), tracks = [], notes = [], ctrls = [], tempos = [];
+  let tempo = 120, tick = 0, master = 127, loopMaster = -1, stop = false;
+  const times = [0];
+  const newTrack = (i, pos) => (tracks[i] = { i, pos, wait:0, ended:false, prog:0, vol:127, expr:127, pan:64, bend:0, brange:2, transpose:0, noteWait:true,
+    a:-1, dd:-1, s:-1, r:-1, mdepth:0, mspeed:16, mrange:1, stack:[], loops:[], flag:true, jumps:0 });
+  newTrack(0, 0);
+  const ctrl = (t, k, v) => ctrls.push({ tick, tr:t.i, k, v });
+  const rdvar = t => { let v = 0, b, n = 0; do { b = d[t.pos++]; v = (v << 7) | (b & 0x7f); } while ((b & 0x80) && ++n < 4); return v; };
+  const rd24 = t => { const v = d[t.pos] | d[t.pos+1] << 8 | d[t.pos+2] << 16; t.pos += 3; return v; };
+  const rs16 = t => { const v = s16(d, t.pos); t.pos += 2; return v; };
+  const noteOn = (t, key, vel, dur) => {
+    notes.push({ tick, tr:t.i, key:Math.max(0, Math.min(127, key + t.transpose)), vel, dur, prog:t.prog, a:t.a, d:t.dd, s:t.s, r:t.r });
+    if (t.noteWait) t.wait = dur;
+  };
+  const jump = (t, target) => {
+    if (target < t.pos){ t.jumps++; if (loopMaster < 0) loopMaster = t.i; if (t.i === loopMaster && t.jumps >= o.loops){ stop = true; return; } }
+    t.pos = target;
+  };
+  const kindOf = c => (c === 0x80 || c === 0x81) ? "v" : (c >= 0xC0 && c <= 0xD6) ? "b" : (c === 0xE0 || c === 0xE1 || c === 0xE3) ? "w" : "";
+  const apply = (t, c, v, run) => {
+    if (!run) return;
+    switch (c){
+      case 0x80: t.wait = Math.max(0, v); break;
+      case 0x81: t.prog = v; break;
+      case 0xC0: t.pan = v; ctrl(t,"pan",v); break;
+      case 0xC1: t.vol = v; ctrl(t,"vol",v); break;
+      case 0xC2: master = v; ctrl(t,"master",v); break;
+      case 0xC3: t.transpose = v << 24 >> 24; break;
+      case 0xC4: t.bend = v << 24 >> 24; ctrl(t,"bend",t.bend); break;
+      case 0xC5: t.brange = v; ctrl(t,"brange",v); break;
+      case 0xC7: t.noteWait = !!v; break;
+      case 0xCA: t.mdepth = v; ctrl(t,"mdepth",v); break;
+      case 0xCB: t.mspeed = v; ctrl(t,"mspeed",v); break;
+      case 0xCD: t.mrange = v; ctrl(t,"mrange",v); break;
+      case 0xD0: t.a = v; break;
+      case 0xD1: t.dd = v; break;
+      case 0xD2: t.s = v; break;
+      case 0xD3: t.r = v; break;
+      case 0xD4: t.loops.push({ pos:t.pos, n:v }); break;
+      case 0xD5: t.expr = v; ctrl(t,"expr",v); break;
+      case 0xE1: tempo = Math.max(1, v); tempos.push({ tick, bpm:tempo }); break;
+      default: break;
+    }
+  };
+  const varOp = (c, v, val) => {
+    switch (c){
+      case 0xB0: vars[v] = val; break; case 0xB1: vars[v] += val; break; case 0xB2: vars[v] -= val; break;
+      case 0xB3: vars[v] *= val; break; case 0xB4: if (val) vars[v] = Math.trunc(vars[v] / val); break;
+      case 0xB5: vars[v] = val >= 0 ? vars[v] << val : vars[v] >> -val; break;
+      case 0xB6: { const m = Math.abs(val), r = Math.floor(Math.random() * (m + 1)); vars[v] = val < 0 ? -r : r; break; }
+      default: break;
+    }
+  };
+  const cmp = (t, c, v, val) => {
+    const a = vars[v];
+    t.flag = c === 0xB8 ? a === val : c === 0xB9 ? a >= val : c === 0xBA ? a > val : c === 0xBB ? a <= val : c === 0xBC ? a < val : a !== val;
+  };
+  function exec(t, run){
+    if (t.pos >= d.length){ t.ended = true; return; }
+    const c = d[t.pos++];
+    if (c < 0x80){ const vel = d[t.pos++], dur = rdvar(t); if (run) noteOn(t, c, vel, dur); return; }
+    if (c >= 0xB0 && c <= 0xBD){ const v = d[t.pos++], val = rs16(t); if (!run) return; if (c <= 0xB6) varOp(c, v, val); else cmp(t, c, v, val); return; }
+    switch (c){
+      case 0x93: { const n = d[t.pos++], off = rd24(t); if (run && !tracks[n]) newTrack(n, off); return; }
+      case 0x94: { const tg = rd24(t); if (run) jump(t, tg); return; }
+      case 0x95: { const tg = rd24(t); if (run){ t.stack.push(t.pos); t.pos = tg; } return; }
+      case 0xFD: if (run){ if (t.stack.length) t.pos = t.stack.pop(); else t.ended = true; } return;
+      case 0xFC: if (run){ const L = t.loops[t.loops.length - 1]; if (!L){ return; }
+        if (L.n === 0){ if (L.pos < t.pos){ t.jumps++; if (loopMaster < 0) loopMaster = t.i; if (t.i === loopMaster && t.jumps >= o.loops){ stop = true; return; } } t.pos = L.pos; }
+        else if (--L.n > 0) t.pos = L.pos; else t.loops.pop(); } return;
+      case 0xFE: t.pos += 2; return;
+      case 0xFF: if (run) t.ended = true; return;
+      case 0xA2: { const f = t.flag; exec(t, run && f); return; }
+      case 0xA0: case 0xA1: {
+        const x = d[t.pos++], isVar = c === 0xA1;
+        if (x < 0x80){ const vel = d[t.pos++]; let dur; if (isVar) dur = vars[d[t.pos++]]; else { const mn = rs16(t), mx = rs16(t); dur = mn + Math.floor(Math.random() * (mx - mn + 1)); } if (run) noteOn(t, x, vel, dur); return; }
+        if (x >= 0xB0 && x <= 0xBD){ const v = d[t.pos++]; let val; if (isVar) val = vars[d[t.pos++]]; else { const mn = rs16(t), mx = rs16(t); val = mn + Math.floor(Math.random() * (mx - mn + 1)); } if (!run) return; if (x <= 0xB6) varOp(x, v, val); else cmp(t, x, v, val); return; }
+        let val; if (isVar) val = vars[d[t.pos++]]; else { const mn = rs16(t), mx = rs16(t); val = mn + Math.floor(Math.random() * (mx - mn + 1)); }
+        apply(t, x, val, run); return;
+      }
+      default: break;
+    }
+    const k = kindOf(c);
+    if (k === "v") return apply(t, c, rdvar(t), run);
+    if (k === "b") return apply(t, c, d[t.pos++], run);
+    if (k === "w") return apply(t, c, rs16(t), run);
+    t.ended = true; // comando desconocido
+  }
+  while (!stop && times[tick] < o.maxSec){
+    for (let i = 0; i < tracks.length; i++){ const t = tracks[i]; if (!t || t.ended) continue; let g = 0; while (t.wait === 0 && !t.ended && !stop && g++ < 4000) exec(t, true); }
+    if (stop || tracks.every(t => !t || t.ended)) break;
+    for (const t of tracks) if (t && !t.ended && t.wait > 0) t.wait--;
+    tick++; times.push(times[tick-1] + 60 / (tempo * 48 * o.tempoScale));
+  }
+  const spt = 60 / (tempo * 48 * o.tempoScale);
+  return { notes, ctrls, times, tempos, spt, endTick:tick, tracks:tracks.filter(Boolean).length, trackIds:tracks.map((t,i) => t ? i : -1).filter(i => i >= 0), tempoScale:o.tempoScale };
+}
+
+/* ---------- Render ---------- */
+const attackRate = a => { const T = [0x00,0x01,0x05,0x0E,0x1A,0x26,0x33,0x3F,0x49,0x54,0x5C,0x64,0x6D,0x74,0x7B,0x7F,0x84,0x89,0x8F]; return a >= 109 ? T[127 - a] : 255 - a; };
+const decayRate = d => d === 127 ? 0xFFFF : d === 126 ? 0x3C00 : d < 50 ? d * 2 + 1 : Math.floor(0x1E00 / (126 - d));
+const sustainAmp = s => s >= 127 ? 0 : s <= 0 ? -92544 : Math.max(-92544, 40 * Math.log10(s / 127) * 1024);
+const SQ = v => (v / 127) * (v / 127);
+
+async function render(sim, R){
+  const SR = R.SR || 32000, B = 32, T = sim.times;
+  const tsec = tick => tick < T.length ? T[tick] : T[T.length - 1] + (tick - (T.length - 1)) * sim.spt;
+  const notes = sim.notes.map(n => Object.assign({}, n, { s0:Math.floor(tsec(n.tick) * SR), s1:Math.floor(tsec(n.tick + n.dur) * SR) }));
+  const ctrls = sim.ctrls.map(c => ({ s:Math.floor(tsec(c.tick) * SR), tr:c.tr, k:c.k, v:c.v }));
+  let last = tsec(sim.endTick) * SR; for (const n of notes) last = Math.max(last, n.s1);
+  const total = Math.floor(last + SR * 1.5);
+  const L = new Float32Array(total), Rr = new Float32Array(total);
+  const cs = []; const st = i => cs[i] || (cs[i] = { vol:127, expr:127, pan:64, bend:0, brange:2, mdepth:0, mspeed:16, mrange:1 });
+  let master = 127, ci = 0, ni = 0, voices = [];
+  const solo = R.solo && R.solo.size ? R.solo : null, seqGain = SQ(R.seqVol == null ? 127 : R.seqVol), gT = R.transpose || 0, volScale = R.trackGain || [];
+  const envSteps = B / (SR / 192);
+  const ln10 = Math.LN10;
+  for (let bs = 0; bs < total; bs += B){
+    while (ci < ctrls.length && ctrls[ci].s <= bs){ const c = ctrls[ci++]; if (c.k === "master") master = c.v; else st(c.tr)[c.k] = c.v; }
+    while (ni < notes.length && notes[ni].s0 <= bs){
+      const n = notes[ni++];
+      if (R.mute && R.mute.has(n.tr)) continue; if (solo && !solo.has(n.tr)) continue;
+      const key = Math.max(0, Math.min(127, n.key + gT)), inst = R.getInst(n.prog, key); if (!inst) continue;
+      let wave = null; if (inst.type === 1){ wave = R.getWave(inst); if (!wave) continue; }
+      const a = n.a >= 0 ? n.a : inst.a, dd = n.d >= 0 ? n.d : inst.d, s = n.s >= 0 ? n.s : inst.s, r = n.r >= 0 ? n.r : inst.r;
+      voices.push({ tr:n.tr, key, vel:SQ(n.vel), inst, wave, pos:0, ar:attackRate(a) , dr:decayRate(dd), rr:decayRate(r), sus:sustainAmp(s), st:0, ampl:-92544, off:n.s1, ph:0, lfo:0, lfsr:0x7fff, nacc:0, dead:false });
+    }
+    if (!voices.length) { if (ni >= notes.length && ci >= ctrls.length) break; continue; }
+    const end = Math.min(B, total - bs);
+    for (let vi = voices.length - 1; vi >= 0; vi--){
+      const v = voices[vi], t = st(v.tr);
+      if (v.st < 3 && bs >= v.off) v.st = 3;
+      switch (v.st){
+        case 0: v.ampl = -((-v.ampl) * Math.pow(v.ar / 256, envSteps)); if (v.ampl > -1){ v.ampl = 0; v.st = 1; } break;
+        case 1: v.ampl -= v.dr * envSteps; if (v.ampl <= v.sus){ v.ampl = v.sus; v.st = 2; } break;
+        case 3: v.ampl -= v.rr * envSteps; if (v.ampl <= -92544){ v.dead = true; } break;
+      }
+      if (v.dead){ voices.splice(vi, 1); continue; }
+      const envLin = Math.exp(v.ampl / 20480 * ln10);
+      const g = v.vel * SQ(t.vol) * SQ(t.expr) * SQ(master) * seqGain * envLin * (volScale[v.tr] == null ? 1 : volScale[v.tr]) * 0.45;
+      if (g < 1e-6) continue;
+      let pp = Math.max(-64, Math.min(63, (t.pan - 64) + (v.inst.pan - 64))) + 64;
+      const th = pp / 127 * Math.PI / 2, gl = Math.cos(th) * 1.4142 * g, gr = Math.sin(th) * 1.4142 * g;
+      let semi = (t.bend / 127) * t.brange;
+      if (t.mdepth > 0){ v.lfo += 2 * Math.PI * (t.mspeed * 0.3125) * B / SR; semi += Math.sin(v.lfo) * t.mrange * (t.mdepth / 64); }
+      if (v.inst.type === 1){
+        const w = v.wave, pcm = w.pcm, len = w.pcm.length, step = (w.rate / SR) * Math.pow(2, (v.key - v.inst.note + semi) / 12);
+        let p = v.pos;
+        for (let i = 0; i < end; i++){
+          const ip = p | 0, fr = p - ip, a0 = pcm[ip], a1 = ip + 1 < len ? pcm[ip+1] : (w.loop ? pcm[w.loopStart] : 0);
+          const smp = a0 + (a1 - a0) * fr;
+          L[bs+i] += smp * gl; Rr[bs+i] += smp * gr;
+          p += step;
+          if (p >= len){ if (w.loop){ p = w.loopStart + (p - len); } else { v.dead = true; break; } }
+        }
+        v.pos = p;
+      } else if (v.inst.type === 2){
+        const duty = (Math.min(6, v.inst.swav) + 1) / 8, inc = 440 * Math.pow(2, (v.key + semi - 69) / 12) / SR;
+        let ph = v.ph; for (let i = 0; i < end; i++){ const smp = (ph < duty ? 0.35 : -0.35); L[bs+i] += smp * gl; Rr[bs+i] += smp * gr; ph += inc; if (ph >= 1) ph -= 1; } v.ph = ph;
+      } else if (v.inst.type === 3){
+        const rate = 32768 * Math.pow(2, (v.key - 60) / 12) / SR; let sm = (v.lfsr & 1) ? -0.3 : 0.3;
+        for (let i = 0; i < end; i++){ v.nacc += rate; while (v.nacc >= 1){ v.nacc -= 1; v.lfsr = (v.lfsr >> 1) ^ ((v.lfsr & 1) ? 0x6000 : 0); sm = (v.lfsr & 1) ? -0.3 : 0.3; } L[bs+i] += sm * gl; Rr[bs+i] += sm * gr; }
+      }
+      if (v.dead) voices.splice(vi, 1);
+    }
+    if (R.progress && (bs / B) % 800 === 0){ R.progress(bs / total); await new Promise(r => setTimeout(r)); }
+  }
+  let peak = 0; for (let i = 0; i < total; i++){ const a = Math.abs(L[i]), b = Math.abs(Rr[i]); if (a > peak) peak = a; if (b > peak) peak = b; }
+  if (peak > 0.97){ const k = 0.97 / peak; for (let i = 0; i < total; i++){ L[i] *= k; Rr[i] *= k; } peak = 0.97; }
+  // recortar silencio final
+  let e = total; while (e > SR && Math.abs(L[e-1]) < 1e-4 && Math.abs(Rr[e-1]) < 1e-4) e--;
+  return { L:L.subarray(0, Math.min(total, e + SR / 4 | 0)), R:Rr.subarray(0, Math.min(total, e + SR / 4 | 0)), SR, peak };
+}
+
+/* ---------- STRM ---------- */
+function parseStrm(f){
+  const type = f[0x18], loop = f[0x19], ch = f[0x1a], rate = u16(f,0x1c), loopOff = u32(f,0x20), n = u32(f,0x24), dOff = u32(f,0x28), nb = u32(f,0x2c), bl = u32(f,0x30), lbl = u32(f,0x38);
+  const dataSize = u32(f, dOff + 4) - 8, base = dOff + 8, chans = [];
+  for (let c = 0; c < ch; c++) chans.push([]);
+  let pos = base;
+  for (let b = 0; b < nb; b++){
+    const last = b === nb - 1, len = last ? lbl : bl;
+    const stride = last ? Math.floor((base + dataSize - pos) / ch) : bl;
+    for (let c = 0; c < ch; c++){
+      const o = pos + c * stride; let pcm;
+      if (type === 0){ pcm = new Float32Array(len); for (let i = 0; i < len; i++) pcm[i] = (f[o+i] << 24 >> 24) / 128; }
+      else if (type === 1){ pcm = new Float32Array(len >> 1); for (let i = 0; i < pcm.length; i++) pcm[i] = s16(f, o + i*2) / 32768; }
+      else pcm = adpcm(f, o, len);
+      chans[c].push(pcm);
+    }
+    pos += stride * ch;
+  }
+  const data = chans.map(parts => { let t = 0; parts.forEach(p => t += p.length); const o = new Float32Array(t); let k = 0; parts.forEach(p => { o.set(p, k); k += p.length; }); return o; });
+  return { rate, loop:!!loop, loopStart:type === 0 ? loopOff : loopOff, channels:data, samples:data[0] ? data[0].length : 0 };
+}
+
+/* ---------- Salidas ---------- */
+function wavBlob(L, R, SR){
+  const n = L.length, buf = new ArrayBuffer(44 + n * 4), v = new DataView(buf), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4, 36 + n*4, true); w(8,"WAVEfmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,2,true); v.setUint32(24,SR,true); v.setUint32(28,SR*4,true); v.setUint16(32,4,true); v.setUint16(34,16,true); w(36,"data"); v.setUint32(40, n*4, true);
+  for (let i = 0; i < n; i++){ v.setInt16(44 + i*4, Math.max(-1, Math.min(1, L[i])) * 32767, true); v.setInt16(46 + i*4, Math.max(-1, Math.min(1, R[i])) * 32767, true); }
+  return new Blob([buf], { type:"audio/wav" });
+}
+function midiBlob(sim){
+  const PPQ = 48, trk = [], vlq = n => { const b = [n & 0x7f]; while ((n >>= 7)) b.unshift((n & 0x7f) | 0x80); return b; };
+  const ids = sim.trackIds, tracks = [];
+  const tempoTrack = []; let lt = 0;
+  const tm = [{ tick:0, bpm:120 }].concat(sim.tempos).sort((a,b) => a.tick - b.tick);
+  for (const t of tm){ const us = Math.round(60000000 / t.bpm); tempoTrack.push([t.tick, [0xFF,0x51,3,(us>>16)&255,(us>>8)&255,us&255]]); }
+  tracks.push(tempoTrack);
+  for (const id of ids){
+    const ev = []; let ch = id % 16; if (ch === 9) ch = 15;
+    const mine = sim.notes.filter(n => n.tr === id); let lastProg = -1;
+    for (const n of mine){
+      if (n.prog !== lastProg){ ev.push([n.tick, [0xC0 | ch, n.prog & 127]]); lastProg = n.prog; }
+      ev.push([n.tick, [0x90 | ch, n.key, Math.max(1, n.vel)]]); ev.push([n.tick + Math.max(1, n.dur), [0x80 | ch, n.key, 0]]);
+    }
+    for (const c of sim.ctrls) if (c.tr === id){ if (c.k === "vol") ev.push([c.tick, [0xB0|ch, 7, c.v]]); else if (c.k === "pan") ev.push([c.tick, [0xB0|ch, 10, c.v]]); else if (c.k === "expr") ev.push([c.tick, [0xB0|ch, 11, c.v]]); }
+    tracks.push(ev);
+  }
+  const chunks = [];
+  const hdr = [0x4d,0x54,0x68,0x64,0,0,0,6,0,1,(tracks.length>>8)&255,tracks.length&255,(PPQ>>8)&255,PPQ&255]; chunks.push(...hdr);
+  for (const ev of tracks){
+    ev.sort((a,b) => a[0] - b[0] || ((a[1][0] & 0xF0) === 0x80 ? -1 : 1)); const body = []; let lt2 = 0;
+    for (const [t, d] of ev){ body.push(...vlq(t - lt2), ...d); lt2 = t; }
+    body.push(0,0xFF,0x2F,0);
+    chunks.push(0x4d,0x54,0x72,0x6b,(body.length>>>24)&255,(body.length>>16)&255,(body.length>>8)&255,body.length&255, ...body);
+  }
+  return new Blob([new Uint8Array(chunks)], { type:"audio/midi" });
+}
+
+return { parseSdat, parseBank, parseSwar, simulate, render, parseStrm, wavBlob, midiBlob };
+})();
+
+
+</script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const u16 = (b,o) => b[o] | b[o+1] << 8;
+const u32 = (b,o) => (b[o] | b[o+1] << 8 | b[o+2] << 16 | b[o+3] << 24) >>> 0;
+const fmt = s => { s = Math.max(0, s); return Math.floor(s/60) + ":" + String(Math.floor(s%60)).padStart(2,"0"); };
+
+/* ---------- ROM ---------- */
+async function unzipFirstNds(buf){
+  const b = new Uint8Array(buf); let eocd = -1;
+  for (let i = b.length - 22; i >= Math.max(0, b.length - 65558); i--) if (u32(b,i) === 0x06054b50){ eocd = i; break; }
+  if (eocd < 0) throw new Error("ZIP no válido.");
+  let p = u32(b, eocd + 16); const n = u16(b, eocd + 10);
+  for (let k = 0; k < n; k++){
+    if (u32(b,p) !== 0x02014b50) break;
+    const method = u16(b,p+10), csize = u32(b,p+20), nl = u16(b,p+28), el = u16(b,p+30), cl = u16(b,p+32), lho = u32(b,p+42);
+    const name = new TextDecoder().decode(b.subarray(p+46, p+46+nl)); p += 46 + nl + el + cl;
+    if (!/\.nds$/i.test(name)) continue;
+    const start = lho + 30 + u16(b,lho+26) + u16(b,lho+28), comp = b.subarray(start, start + csize);
+    if (method === 0) return comp.slice();
+    if (method !== 8) throw new Error("Compresión ZIP no soportada.");
+    const ds = new Blob([comp]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return new Uint8Array(await new Response(ds).arrayBuffer());
+  }
+  throw new Error("El ZIP no contiene ningún .nds.");
+}
+function parseNitroFS(r){
+  const fntO = u32(r,0x40), fatO = u32(r,0x48), total = u32(r,0x4C) >> 3, names = new Map();
+  const walk = (dirId, path) => {
+    const base = fntO + (dirId & 0xFFF) * 8; let p = fntO + u32(r,base), fid = u16(r,base+4);
+    for (;;){ const t = r[p++]; if (t === 0) break; const l = t & 0x7F; let nm = ""; for (let i = 0; i < l; i++) nm += String.fromCharCode(r[p+i]); p += l;
+      if (t & 0x80){ const sub = u16(r,p); p += 2; walk(sub, path + nm + "/"); } else names.set(fid++, path + nm); }
+  };
+  walk(0xF000, "");
+  const out = []; for (let i = 0; i < total; i++){ const s = u32(r, fatO + i*8), e = u32(r, fatO + i*8 + 4); out.push({ id:i, name:names.get(i) || ("file_"+i), start:s, end:e }); }
+  return out;
+}
+
+/* ---------- estado ---------- */
+let rom = null, sd = null, tab = "bgm", cur = null, sim = null, rend = null, token = 0, buf = null, loadedRaw = null;
+const bankCache = {}, swarCache = {}, mute = new Set(), solo = new Set(), tgain = [];
+let ac = null, gainNode = null, src = null, startedAt = 0, pausedAt = 0, playing = false, raf = 0, dur = 0;
+let rollCache = null;
+const pretty = n => String(n).replace(/^(WAVE|BANK)_BGM_/,"").replace(/^BGM_/,"").replace(/_/g," ");
+const hue = i => "hsl(" + ((i * 47) % 360) + " 65% 60%)";
+
+function ensureAC(){ if (!ac){ ac = new (window.AudioContext || window.webkitAudioContext)(); gainNode = ac.createGain(); gainNode.gain.value = $("vol").value / 100; gainNode.connect(ac.destination); } if (ac.state === "suspended") ac.resume(); }
+function setStatus(h){ $("status").innerHTML = h; }
+function progress(f){ $("prog").style.width = (f * 100) + "%"; }
+
+/* ---------- listas ---------- */
+function items(){
+  if (!sd) return [];
+  const q = $("q").value.trim().toLowerCase();
+  let l;
+  if (tab === "bgm") l = sd.seqs.filter(s => s.bank < 47).map(s => ({ key:"s"+s.id, label:pretty(s.name), meta:"#"+s.id, seq:s }));
+  else if (tab === "se") l = sd.seqs.filter(s => s.bank >= 47).map(s => ({ key:"s"+s.id, label:pretty(s.name), meta:"#"+s.id, seq:s }));
+  else if (tab === "strm") l = sd.strms.map(s => ({ key:"t"+s.id, label:pretty(s.name), meta:"stream", strm:s }));
+  else l = sd.wavearcs.map((w,i) => w && ({ key:"w"+i, label:pretty(w.name || ("WAVEARC_"+i)), meta:"banco", arc:i })).filter(Boolean);
+  return q ? l.filter(x => x.label.toLowerCase().includes(q)) : l;
+}
+let openArc = -1;
+function buildList(){
+  const box = $("list"); box.textContent = "";
+  if (!sd){ box.innerHTML = '<div class="empty"><strong>Abre la ROM</strong> para listar las canciones (OST) y los efectos (SFX).</div>'; return; }
+  for (const it of items()){
+    const b = document.createElement("button"); b.className = "item" + (cur && cur.key === it.key ? " on" : ""); b.dataset.key = it.key;
+    b.innerHTML = "<span></span><small></small>"; b.firstChild.textContent = it.label; b.lastChild.textContent = it.meta;
+    b.onclick = () => pick(it); box.appendChild(b);
+    if (it.arc !== undefined && openArc === it.arc){
+      const swar = getSwar(it.arc);
+      for (let i = 0; i < swar.count; i++){
+        const w = swar.wave(i); if (!w) continue;
+        const c = document.createElement("button"); c.className = "item sub-item" + (cur && cur.key === "w"+it.arc+"."+i ? " on" : "");
+        c.innerHTML = "<span></span><small></small>"; c.firstChild.textContent = "Onda " + i; c.lastChild.textContent = w.rate + " Hz · " + (w.pcm.length / w.rate).toFixed(2) + " s";
+        c.onclick = ev => { ev.stopPropagation(); pickWave(it.arc, i); }; box.appendChild(c);
+      }
+    }
+  }
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b)); tab = b.dataset.tab; buildList(); });
+$("q").addEventListener("input", buildList);
+
+function getBank(id){ return bankCache[id] || (bankCache[id] = AE.parseBank(sd.file(sd.banks[id].fileId))); }
+function getSwar(arc){ return swarCache[arc] || (swarCache[arc] = AE.parseSwar(sd.file(sd.wavearcs[arc].fileId))); }
+
+/* ---------- selección ---------- */
+function pick(it){
+  if (it.arc !== undefined){ openArc = openArc === it.arc ? -1 : it.arc; buildList(); return; }
+  stopPlayback(true); cur = it; buildList();
+  if (it.seq) openSeq(it); else if (it.strm) openStrm(it);
+}
+async function openSeq(it){
+  mute.clear(); solo.clear(); tgain.length = 0;
+  $("ttl").textContent = it.label; ["xmid","xraw"].forEach(i => $(i).disabled = false);
+  await buildSong(true);
+}
+async function buildSong(autoplay, resumeFrac){
+  const my = ++token, seq = cur.seq, bk = sd.banks[seq.bank];
+  if (!bk){ setStatus("<span style='color:var(--bad)'>Banco " + seq.bank + " no encontrado.</span>"); return; }
+  setStatus("Renderizando <b>" + cur.label + "</b>…"); progress(0.02);
+  const bank = getBank(seq.bank);
+  sim = AE.simulate(sd.file(seq.fileId), { loops:+$("loops").value, maxSec:300, tempoScale:$("tempo").value / 100 });
+  const R = { SR:32000, seqVol:seq.vol, transpose:+$("trans").value, mute, solo, trackGain:tgain,
+    getInst:(p,k) => bank.get(p,k),
+    getWave:inst => { const wid = bk.wars[inst.swar]; if (wid == null || wid === 65535 || !sd.wavearcs[wid]) return null; return getSwar(wid).wave(inst.swav); },
+    progress:f => { if (my === token) progress(0.02 + f * 0.98); } };
+  let r; try { r = await AE.render(sim, R); } catch (e){ setStatus("<span style='color:var(--bad)'>Error al renderizar: " + e.message + "</span>"); return; }
+  if (my !== token) return;
+  progress(0); rend = r; setBuffer(r); buildTracks(); drawRollStatic();
+  setStatus("<b>" + cur.label + "</b> · " + sim.notes.length + " notas · " + sim.tracks + " pistas · " + fmt(dur) + " · bucle ×" + $("loops").value);
+  ["bplay","bstop","seek","xwav"].forEach(i => $(i).disabled = false);
+  if (autoplay) play(0); else if (resumeFrac != null) play(resumeFrac * dur);
+}
+async function openStrm(it){
+  $("ttl").textContent = it.label; ["xmid","xraw"].forEach(i => $(i).disabled = true); sim = null; $("tracks").innerHTML = '<div class="note">Los streams son audio ya grabado: no tienen pistas.</div>';
+  setStatus("Decodificando stream…"); await new Promise(r => setTimeout(r, 20));
+  const st = AE.parseStrm(sd.file(it.strm.fileId)), L = st.channels[0], R = st.channels[1] || st.channels[0];
+  rend = { L, R, SR:st.rate }; setBuffer(rend); drawWave(L); setStatus("<b>" + it.label + "</b> · stream " + st.rate + " Hz · " + fmt(dur));
+  ["bplay","bstop","seek","xwav"].forEach(i => $(i).disabled = false); play(0);
+}
+function pickWave(arc, i){
+  stopPlayback(true); const w = getSwar(arc).wave(i); if (!w) return;
+  cur = { key:"w"+arc+"."+i, label:pretty(sd.wavearcs[arc].name) + " · onda " + i }; sim = null; $("ttl").textContent = cur.label;
+  ["xmid","xraw"].forEach(x => $(x).disabled = true); $("tracks").innerHTML = '<div class="note">Muestra individual (' + (w.loop ? "con bucle: se reproduce dos veces" : "sin bucle") + ').</div>';
+  let pcm = w.pcm; if (w.loop){ const part = w.pcm.subarray(w.loopStart), out = new Float32Array(w.loopStart + part.length * 2); out.set(w.pcm.subarray(0, w.loopStart)); out.set(part, w.loopStart); out.set(part, w.loopStart + part.length); pcm = out; }
+  rend = { L:pcm, R:pcm, SR:w.rate }; setBuffer(rend); drawWave(pcm);
+  setStatus("Onda " + i + " · " + w.rate + " Hz · " + ["PCM8","PCM16","ADPCM"][w.type] + (w.loop ? " · bucle" : ""));
+  ["bplay","bstop","seek","xwav"].forEach(x => $(x).disabled = false); buildList(); play(0);
+}
+
+/* ---------- audio ---------- */
+function setBuffer(r){
+  ensureAC(); buf = ac.createBuffer(2, r.L.length, r.SR); buf.copyToChannel(r.L, 0); buf.copyToChannel(r.R, 1); dur = buf.duration; pausedAt = 0; updateTime(0);
+}
+function stopSrc(){ if (src){ src.onended = null; try { src.stop(); } catch (e){} src.disconnect(); src = null; } }
+function play(from){
+  if (!buf) return; ensureAC(); stopSrc();
+  src = ac.createBufferSource(); src.buffer = buf; src.loop = $("repeat").value === "1" && !!sim; src.connect(gainNode);
+  src.onended = () => { if (playing && !src.loop){ playing = false; pausedAt = 0; $("bplay").textContent = "▶ Reproducir"; updateTime(0); } };
+  from = Math.min(Math.max(0, from), Math.max(0, dur - 0.01)); src.start(0, from); startedAt = ac.currentTime - from; playing = true;
+  $("bplay").textContent = "❚❚ Pausa"; cancelAnimationFrame(raf); tick();
+}
+function pausePlayback(){ if (!playing) return; pausedAt = pos(); stopSrc(); playing = false; $("bplay").textContent = "▶ Reproducir"; cancelAnimationFrame(raf); }
+function stopPlayback(silent){ stopSrc(); playing = false; pausedAt = 0; cancelAnimationFrame(raf); $("bplay").textContent = "▶ Reproducir"; if (!silent) updateTime(0); }
+const pos = () => { let p = playing ? ac.currentTime - startedAt : pausedAt; if (src && src.loop && dur) p %= dur; return p; };
+function tick(){ updateTime(pos()); if (playing) raf = requestAnimationFrame(tick); }
+function updateTime(p){ $("time").textContent = fmt(p) + " / " + fmt(dur); if (!seeking) $("seek").value = dur ? Math.min(1000, p / dur * 1000) : 0; drawRollFrame(p); }
+let seeking = false;
+$("seek").addEventListener("input", () => { seeking = true; updateTime($("seek").value / 1000 * dur); });
+$("seek").addEventListener("change", () => { seeking = false; const p = $("seek").value / 1000 * dur; if (playing) play(p); else { pausedAt = p; updateTime(p); } });
+$("bplay").onclick = () => { if (!buf) return; if (playing) pausePlayback(); else play(pausedAt); };
+$("bstop").onclick = () => stopPlayback(false);
+$("vol").addEventListener("input", () => { if (gainNode) gainNode.gain.value = $("vol").value / 100; });
+$("repeat").addEventListener("input", () => { if (src) src.loop = $("repeat").value === "1" && !!sim; });
+
+/* ---------- pistas y ajustes (re-render) ---------- */
+let rerenderT = 0;
+function rerender(){ if (!cur || !cur.seq) return; clearTimeout(rerenderT); rerenderT = setTimeout(() => { const f = playing ? pos() / dur : null; stopPlayback(true); buildSong(false, f); }, 350); }
+$("tempo").addEventListener("input", () => { $("tempoV").textContent = "×" + ($("tempo").value / 100).toFixed(2); rerender(); });
+$("trans").addEventListener("input", () => { $("transV").textContent = $("trans").value; rerender(); });
+$("loops").addEventListener("input", rerender);
+function buildTracks(){
+  const box = $("tracks"); box.textContent = "";
+  for (const id of sim.trackIds){
+    const mine = sim.notes.filter(n => n.tr === id), progs = [...new Set(mine.map(n => n.prog))];
+    const row = document.createElement("div"); row.className = "trk";
+    row.innerHTML = '<i></i><div class="n"></div><button class="mini m" title="Silenciar">M</button><button class="mini s" title="Solo">S</button><input type="range" min="0" max="150" value="' + Math.round((tgain[id] == null ? 1 : tgain[id]) * 100) + '" aria-label="Volumen pista ' + id + '">';
+    row.firstChild.style.background = hue(id);
+    row.querySelector(".n").innerHTML = "Pista " + id + "<small>" + mine.length + " notas · prog " + (progs.slice(0,4).join(", ") || "—") + "</small>";
+    const m = row.querySelector(".m"), s = row.querySelector(".s"), v = row.querySelector("input");
+    m.classList.toggle("on", mute.has(id)); s.classList.toggle("on", solo.has(id));
+    m.onclick = () => { mute.has(id) ? mute.delete(id) : mute.add(id); m.classList.toggle("on"); rerender(); };
+    s.onclick = () => { solo.has(id) ? solo.delete(id) : solo.add(id); s.classList.toggle("on"); rerender(); };
+    v.oninput = () => { tgain[id] = v.value / 100; }; v.onchange = rerender;
+    box.appendChild(row);
+  }
+}
+
+/* ---------- visualización ---------- */
+const cv = $("roll"), cx = cv.getContext("2d");
+function fit(){ const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; cv.width = Math.max(10, r.width * d); cv.height = Math.max(10, r.height * d); }
+new ResizeObserver(() => { fit(); if (rend) (sim ? drawRollStatic() : drawWave(rend.L)); }).observe($("roll-wrap"));
+function drawRollStatic(){
+  fit(); const W = cv.width, H = cv.height, g = cx; g.clearRect(0,0,W,H);
+  g.fillStyle = "#101316"; g.fillRect(0,0,W,H);
+  if (!sim || !dur){ rollCache = null; return; }
+  const ns = sim.notes.filter(n => !(mute.has(n.tr)) && (!solo.size || solo.has(n.tr))); if (!ns.length){ rollCache = null; return; }
+  let lo = 127, hi = 0; ns.forEach(n => { lo = Math.min(lo, n.key); hi = Math.max(hi, n.key); }); lo = Math.max(0, lo - 2); hi = Math.min(127, hi + 2);
+  const kh = H / (hi - lo + 1), T = sim.times, spt = sim.spt, ts = t => t < T.length ? T[t] : T[T.length-1] + (t - T.length + 1) * spt;
+  g.strokeStyle = "#1a1f23"; g.lineWidth = 1; for (let k = lo; k <= hi; k++) if (k % 12 === 0){ const y = H - (k - lo + 0.5) * kh; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+  for (const n of ns){ const x0 = ts(n.tick) / dur * W, x1 = Math.max(x0 + 2, ts(n.tick + n.dur) / dur * W), y = H - (n.key - lo + 1) * kh;
+    g.fillStyle = hue(n.tr); g.globalAlpha = 0.35 + 0.65 * (n.vel / 127); g.fillRect(x0, y, x1 - x0, Math.max(2, kh - 1)); }
+  g.globalAlpha = 1; rollCache = g.getImageData(0,0,W,H);
+}
+function drawWave(pcm){
+  fit(); const W = cv.width, H = cv.height, g = cx; g.fillStyle = "#101316"; g.fillRect(0,0,W,H); g.strokeStyle = "#5fc4b0"; g.beginPath();
+  const step = Math.max(1, Math.floor(pcm.length / W));
+  for (let x = 0; x < W; x++){ let mn = 1, mx = -1; const s = Math.floor(x / W * pcm.length); for (let i = 0; i < step; i += Math.max(1, step >> 4)){ const v = pcm[s + i] || 0; if (v < mn) mn = v; if (v > mx) mx = v; } g.moveTo(x, H/2 - mx * H/2 * 0.9); g.lineTo(x, H/2 - mn * H/2 * 0.9 + 1); }
+  g.stroke(); rollCache = g.getImageData(0,0,W,H);
+}
+function drawRollFrame(p){
+  if (!rollCache || !dur) return; cx.putImageData(rollCache, 0, 0);
+  const x = p / dur * cv.width; cx.fillStyle = "#e0b45a"; cx.fillRect(x, 0, Math.max(1, cv.width / 700), cv.height);
+}
+cv.addEventListener("click", ev => { if (!buf) return; const r = cv.getBoundingClientRect(), p = (ev.clientX - r.left) / r.width * dur; if (playing) play(p); else { pausedAt = p; updateTime(p); } });
+
+/* ---------- exportar ---------- */
+const save = (blob, name) => { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
+const fname = () => (cur ? cur.label : "audio").replace(/[^\w]+/g, "_");
+$("xwav").onclick = () => { if (rend) save(AE.wavBlob(rend.L, rend.R, rend.SR), fname() + ".wav"); };
+$("xmid").onclick = () => { if (sim) save(AE.midiBlob(sim), fname() + ".mid"); };
+$("xraw").onclick = () => { if (cur && cur.seq) save(new Blob([sd.file(cur.seq.fileId)]), fname() + ".sseq"); };
+
+/* ---------- cargar ROM ---------- */
+$("rom-in").addEventListener("change", async ev => {
+  const f = ev.target.files[0]; if (!f) return; setStatus("Leyendo " + f.name + "…");
+  try {
+    let b = new Uint8Array(await f.arrayBuffer());
+    if (/\.zip$/i.test(f.name) || u32(b,0) === 0x04034b50) b = await unzipFirstNds(b.buffer);
+    rom = b; const files = parseNitroFS(rom), s = files.find(x => /\.sdat$/i.test(x.name));
+    if (!s) throw new Error("No se encontró ningún .sdat en la ROM.");
+    sd = AE.parseSdat(rom.subarray(s.start, s.end)); buildList();
+    setStatus("ROM cargada · <b>" + sd.seqs.length + "</b> secuencias · " + sd.banks.length + " bancos · " + sd.wavearcs.length + " archivos de ondas · " + sd.strms.length + " stream");
+  } catch (e){ setStatus("<span style='color:var(--bad)'>" + e.message + "</span>"); }
+});
+fit();
+</script>
+</body>
+</html>
