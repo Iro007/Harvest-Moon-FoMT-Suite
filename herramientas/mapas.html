@@ -73,12 +73,12 @@ input[type=text] { width: 100%; }
 .stage { position: relative; display: inline-block; vertical-align: top; }
 #ovl, #warpovl { position: absolute; left: 0; top: 0; pointer-events: none; }
 #warpovl { z-index: 5; }
-#npcovl { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 6; }
+#npcovl { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 4; }
 .warpedit { margin-top: 8px; padding: 8px; border: 1px solid var(--warp-color); border-radius: 4px; font-size: 12px; }
 .warpedit .row + .row { margin-top: 6px; }
 .warpedit input[type=number] { width: 64px; }
 .warpedit select { max-width: 220px; }
-table.warptable canvas.npcspr { width: 16px; height: 40px; image-rendering: pixelated; display: block; }
+table.warptable canvas.npcspr { height: 32px; image-rendering: pixelated; display: block; }
 table.warptable tr.dim td { opacity: .55; }
 table.warptable td input.mapnum { width: 54px; }
 table.warptable td input.mapnum.changed { border-color: var(--sel); }
@@ -490,7 +490,8 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     6: [{ name: 'Casa del pueblo', opts: [[38, 60, 0]] }], 7: [{ name: 'Casa del pueblo', opts: [[39, 60, 0]] }],
     8: [{ name: 'Decoración de playa (verano?)', opts: [[42, 10, 25]] }, { name: 'Casa de la playa', opts: [[40, 23, 52]] }],
     9: [{ name: 'Casa de la playa', opts: [[41, 23, 52]] }],
-    14: [{ name: 'Casa de la montaña', opts: [[44, 36, 2]] }], 15: [{ name: 'Casa de la montaña', opts: [[45, 36, 2]] }],
+    // Mapa 15 (invierno): func_080A6660 pega siempre el parche 37 en (32,32): solo colisión, el lago helado se puede pisar.
+    14: [{ name: 'Casa de la montaña', opts: [[44, 36, 2]] }], 15: [{ name: 'Lago helado (solo colisión)', opts: [[37, 32, 32]] }, { name: 'Casa de la montaña', opts: [[45, 36, 2]] }],
     24: [{ name: 'Objeto (52)', opts: [[52, 40, 29]] }],
     25: [{ name: 'Objeto (46)', opts: [[46, 33, 20]] }, { name: 'Objeto (47)', opts: [[47, 33, 23]] }, { name: 'Objeto según estado (49/50/51)', opts: [[49, 12, 20], [50, 12, 20], [51, 12, 20]] }],
     37: [{ name: 'Objeto (32)', opts: [[32, 2, 5]] }],
@@ -2616,46 +2617,89 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   /* func_0803D7E4 crea un horario por NPC: ScheduleInfo {select, n, Schedule*[n]}; Schedule {n, ScheduleEntry*};
      ScheduleEntry {hora (min desde las 6:00), PathInfo*}; PathInfo {puntos*, n, x, y (px), escena:10 orientación:2
      tipoB:1}. Cada punto fija la nueva x o la nueva y (bit «is_y»). Ver StanHash_fomt include/schedule_info.hh.
-     [id del NPC, ScheduleInfo, nombre, sprite 4bpp, paleta]: el id y el ScheduleInfo salen de los constructores de
-     code_entities_08034CEC.s; el nombre, de su ID de animación. El sprite es la pose de frente (tiles 0..9, 16×40). */
+     [id del NPC, ScheduleInfo, nombre, animación «quieto»]: salen de los constructores de code_entities_08034CEC.s
+     (ANpcEntity(ScheduleInfo, anim, anim + 4, id)). La animación +0..+3 es quieto mirando abajo/arriba/izquierda/derecha.
+     Son todos los ScheduleInfo de la ROM; los NPC sin horario (duendes, Diosa, Kappa, Gourmet…) los coloca el código
+     de cada escena y no aparecen aquí. */
   var NPC_TABLE = [
-    [0x3E0, 0x80F1A80, "Rick", 0x5FA73C, 0x662440], [0x3E1, 0x80F1FC0, "Popuri", 0x5FC83C, 0x662480], [0x3E2, 0x80F280C, "Lillia", 0x5FFFBC, 0x6624E0],
-    [0x3E3, 0x80F29C0, "Bebé", 0x601F5C, 0x662500], [0x3E4, 0x80F2AF8, "Cliff", 0x60201C, 0x662520], [0x3E5, 0x80F2DC0, "Zack", 0x60E43C, 0x6625C0],
-    [0x3E6, 0x80F3010, "Doctor", 0x60F1BC, 0x6625E0], [0x3EE, 0x80F33B8, "Ellen", 0x62239C, 0x662A80], [0x3EF, 0x80F3408, "Jeff", 0x62251C, 0x662AA0],
-    [0x3F0, 0x80F35E4, "Karen", 0x62329C, 0x662AC0], [0x3F1, 0x80F3FD8, "Sasha", 0x62761C, 0x662B20], [0x3F2, 0x80F42F0, "Doug", 0x63499C, 0x662D20],
-    [0x3F3, 0x80F43DC, "Ann", 0x635B9C, 0x662D40], [0x3F4, 0x80F4974, "Lou", 0x63979C, 0x662DA0], [0x3F5, 0x80F49C0, "Basil", 0x63B59C, 0x662E00],
-    [0x3F6, 0x80F4D74, "Mary", 0x63C31C, 0x662E20], [0x3F7, 0x80F5540, "Anna", 0x64057C, 0x662E80], [0x3F8, 0x80F597C, "Won", 0x64177C, 0x662EA0],
-    [0x3F9, 0x80F59CC, "Thomas", 0x6424FC, 0x662EC0], [0x3FA, 0x80F5D94, "Elli", 0x643E7C, 0x662F20], [0x3FB, 0x80F61FC, "Stu", 0x647A7C, 0x662F80],
-    [0x3FC, 0x80F6370, "Duke", 0x64813C, 0x662FA0], [0x3FD, 0x80F66C4, "Manna", 0x6494BC, 0x662FC0], [0x3FE, 0x80F6B10, "Van", 0x64A23C, 0x662FE0],
-    [0x3FF, 0x80F6B4C, "Harris", 0x64B83C, 0x663000], [0x400, 0x80F6DE8, "Carter", 0x64C5BC, 0x663020], [0x401, 0x80F6FF8, "Kai", 0x64D93C, 0x663080],
-    [0x402, 0x80F7294, "Gray", 0x659CBC, 0x6630C0], [0x403, 0x80F77FC, "Saibara", 0x65BC3C, 0x663100], [0x404, 0x80F7B40, "Gotz", 0x65E4BC, 0x6631A0],
-    [0x405, 0x80F81BC, "May", 0x6602BC, 0x6631C0], [0x406, 0x80F8678, "Barley", 0x66103C, 0x6631E0]
+    [0x3E0, 0x80F1A80, "Rick", 0x213], [0x3E1, 0x80F1FC0, "Popuri", 0x22F], [0x3E2, 0x80F280C, "Lillia", 0x25F],
+    [0x3E3, 0x80F29C0, "Niño (0x3E3)", 0x267], [0x3E4, 0x80F2AF8, "Cliff", 0x27B], [0x3E5, 0x80F2DC0, "Zack", 0x318],
+    [0x3E6, 0x80F3010, "Doctor", 0x320], [0x3EE, 0x80F33B8, "Ellen", 0x685], [0x3EF, 0x80F3408, "Jeff", 0x689],
+    [0x3F0, 0x80F35E4, "Karen", 0x691], [0x3F1, 0x80F3FD8, "Sasha", 0x6C5], [0x3F2, 0x80F42F0, "Doug", 0x7B2],
+    [0x3F3, 0x80F43DC, "Ann", 0x7BE], [0x3F4, 0x80F4974, "Lou", 0x7F2], [0x3F5, 0x80F49C0, "Basil", 0x80B],
+    [0x3F6, 0x80F4D74, "Mary", 0x813], [0x3F7, 0x80F5540, "Anna", 0x84B], [0x3F8, 0x80F597C, "Won", 0x857],
+    [0x3F9, 0x80F59CC, "Thomas", 0x85F], [0x3FA, 0x80F5D94, "Elli", 0x884], [0x3FB, 0x80F61FC, "Stu", 0x8B8],
+    [0x3FC, 0x80F6370, "Duke", 0x8C0], [0x3FD, 0x80F66C4, "Manna", 0x8D0], [0x3FE, 0x80F6B10, "Van", 0x8D8],
+    [0x3FF, 0x80F6B4C, "Harris", 0x8E4], [0x400, 0x80F6DE8, "Carter", 0x8EC], [0x401, 0x80F6FF8, "Kai", 0x902],
+    [0x402, 0x80F7294, "Gray", 0x989], [0x403, 0x80F77FC, "Saibara", 0x9A1], [0x404, 0x80F7B40, "Gotz", 0x9D3],
+    [0x405, 0x80F81BC, "May", 0x9E7], [0x406, 0x80F8678, "Barley", 0x9EF]
   ];
   var npcData = null, npcVariant = {}, npcSel = -1, npcLastMap = null;
 
   function readNpcPath(rom, a) {
     var p = u32(rom, a) & 0x1FFFFFF, n = u16(rom, a + 4), h = u16(rom, a + 10), typeB = (h >> 12) & 1;
-    var pts = [[u16(rom, a + 6), u16(rom, a + 8)]];
+    var pts = [[u16(rom, a + 6), u16(rom, a + 8)]], face = (h >> 10) & 3;
     for (var i = 0; p && i < n; i++) {
       var q = p + i * 8, hi = u32(rom, q + 4), isY = typeB ? (hi >> 18) & 1 : hi & 1;
+      if (typeB) face = (hi >> 16) & 3;
       var v = typeB ? u16(rom, q) : (u16(rom, q + 2) << 16) >> 16, last = pts[pts.length - 1];
       pts.push(isY ? [last[0], v] : [v, last[1]]);
     }
-    return { addr: a, scene: h & 0x3FF, face: (h >> 10) & 3, typeB: typeB, pts: pts };
+    return { addr: a, scene: h & 0x3FF, face: face, typeB: typeB, pts: pts };
   }
-  function npcSprite(rom, g, p) {
-    var c = document.createElement('canvas'); c.width = 16; c.height = 40;
-    var cx = c.getContext('2d'), im = cx.createImageData(16, 40), pal = [];
-    for (var i = 0; i < 16; i++) pal.push(rgbOf(u16(rom, p + i * 2)));
-    for (var t = 0; t < 10; t++) for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) {
-      var b = rom[g + t * 32 + y * 4 + (x >> 1)], v = (x & 1) ? b >> 4 : b & 15, o = (((t >> 1) * 8 + y) * 16 + (t & 1) * 8 + x) * 4;
-      if (!v) continue;
-      im.data[o] = pal[v][0]; im.data[o + 1] = pal[v][1]; im.data[o + 2] = pal[v][2]; im.data[o + 3] = 255;
+  /* Banco de animaciones de sprites gUnk_0858BA28 (mismo formato que el «animator» de HM-Studio): u32 n + rangos
+     {n, inicio} por animación; u32 n + fotogramas {oam, tiles, colores, afín} (pares {n, inicio}); u32 n + atributos OAM
+     de 8 bytes; u32 n + tiles 4bpp; u32 n + paletas; u32 n + afines; u32 n + instrucciones {fotograma, tiempo}.
+     El origen (0,0) de cada fotograma es la posición de la entidad (los pies). */
+  var ANIM_BANK_LITERAL = 0x52714, OAM_DIMS = [[8, 8], [16, 16], [32, 32], [64, 64], [16, 8], [32, 8], [32, 16], [64, 32], [8, 16], [8, 32], [16, 32], [32, 64]];
+  function readAnimBank(rom) {
+    var o = u32(rom, ANIM_BANK_LITERAL) & 0x1FFFFFF, B = {};
+    B.na = u32(rom, o); B.ranges = o + 4; o += 4 + 4 * B.na;
+    B.nf = u32(rom, o); B.frames = o + 4; o += 4 + 16 * B.nf;
+    B.no = u32(rom, o); B.oam = o + 4; o += 4 + 8 * B.no;
+    B.nt = u32(rom, o); B.tiles = o + 4; o += 4 + 32 * B.nt;
+    B.np = u32(rom, o); B.pals = o + 4; o += 4 + 32 * B.np;
+    o += 4 + 8 * u32(rom, o);
+    B.ni = u32(rom, o); B.ins = o + 4;
+    if (B.na > 8192 || B.nf > 8192 || B.ins + 4 * B.ni > rom.length) throw new Error('banco de animaciones no reconocido');
+    return B;
+  }
+  // Primer fotograma de la animación aid: {c: canvas, ox, oy}, con (ox, oy) = dónde cae el origen dentro del canvas.
+  function animSprite(rom, B, aid) {
+    if (aid >= B.na) return null;
+    var fi = u16(rom, B.ins + 4 * u16(rom, B.ranges + aid * 4 + 2)), f = B.frames + fi * 16;
+    if (fi >= B.nf) return null;
+    var ol = u16(rom, f), os = u16(rom, f + 2), ts = u16(rom, f + 6), cs = u16(rom, f + 10), ps = [], x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    for (var k = 0; k < ol; k++) {
+      var a = B.oam + (os + k) * 8, a0 = u16(rom, a), a1 = u16(rom, a + 2), a2 = u16(rom, a + 4);
+      var d = OAM_DIMS[(a0 >> 14) * 4 + (a1 >> 14)] || [8, 8], x = (a1 & 0x1FF) << 23 >> 23, y = (a0 & 0xFF) << 24 >> 24;
+      ps.push({ x: x, y: y, w: d[0], h: d[1], tile: a2 & 0x3FF, pal: (a2 >> 12) & 15, hf: (a1 >> 12) & 1, vf: (a1 >> 13) & 1 });
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + d[0]); y1 = Math.max(y1, y + d[1]);
     }
+    if (!ps.length) return null;
+    var c = document.createElement('canvas'); c.width = x1 - x0; c.height = y1 - y0;
+    var cx = c.getContext('2d'), im = cx.createImageData(c.width, c.height);
+    ps.forEach(function (p) {
+      var po = B.pals + (cs + p.pal) * 32, pal = [], tw = p.w >> 3;
+      for (var i = 0; i < 16; i++) pal.push(rgbOf(u16(rom, po + i * 2)));
+      for (var t = 0; t < tw * (p.h >> 3); t++) {
+        var to = B.tiles + (ts + p.tile + t) * 32;
+        for (var yy = 0; yy < 8; yy++) for (var xx = 0; xx < 8; xx++) {
+          var b = rom[to + yy * 4 + (xx >> 1)], v = (xx & 1) ? b >> 4 : b & 15;
+          if (!v) continue;
+          var px = (t % tw) * 8 + xx, py = Math.floor(t / tw) * 8 + yy;
+          if (p.hf) px = p.w - 1 - px;
+          if (p.vf) py = p.h - 1 - py;
+          var o = ((p.y - y0 + py) * c.width + p.x - x0 + px) * 4;
+          im.data[o] = pal[v][0]; im.data[o + 1] = pal[v][1]; im.data[o + 2] = pal[v][2]; im.data[o + 3] = 255;
+        }
+      }
+    });
     cx.putImageData(im, 0, 0);
-    return c;
+    return { c: c, ox: -x0, oy: -y0 };
   }
   function readNpcs(rom) {
+    var B = readAnimBank(rom);
     return NPC_TABLE.map(function (r, i) {
       var si = r[1] & 0x1FFFFFF, n = Math.min(64, u32(rom, si + 4)), sa = u32(rom, si + 8) & 0x1FFFFFF, scheds = [];
       for (var k = 0; k < n; k++) {
@@ -2667,7 +2711,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
       }
       var def = -1;
       scheds.some(function (s, k) { if (s) { def = k; return true; } return false; });
-      return { id: r[0], name: r[2], scheds: scheds, def: def, sprite: npcSprite(rom, r[3], r[4]), color: 'hsl(' + (i * 47 % 360) + ',90%,55%)' };
+      return { id: r[0], name: r[2], scheds: scheds, def: def, sprites: [0, 1, 2, 3].map(function (f) { return animSprite(rom, B, r[3] + f); }), color: 'hsl(' + (i * 47 % 360) + ',90%,55%)' };
     });
   }
   function hhmm(t) { var m = 360 + t; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
@@ -2709,11 +2753,12 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
       nctx.globalAlpha = 1;
       var e = sc[act];
       if (e && here(e)) {
-        var L = e.path.pts[e.path.pts.length - 1];
-        nctx.drawImage(n.sprite, L[0] - 8, L[1] - 36);
+        var L = e.path.pts[e.path.pts.length - 1], S = n.sprites[e.path.face] || n.sprites[0];
+        if (!S) return;
+        nctx.drawImage(S.c, L[0] - S.ox, L[1] - S.oy);
         nctx.font = 'bold 7px "JetBrains Mono", monospace'; nctx.textAlign = 'center'; nctx.textBaseline = 'bottom';
-        nctx.lineWidth = 2; nctx.strokeStyle = 'rgba(0,0,0,.8)'; nctx.strokeText(n.name, L[0], L[1] - 36);
-        nctx.fillStyle = '#fff'; nctx.fillText(n.name, L[0], L[1] - 36); nctx.textAlign = 'left';
+        nctx.lineWidth = 2; nctx.strokeStyle = 'rgba(0,0,0,.8)'; nctx.strokeText(n.name, L[0], L[1] - S.oy - 1);
+        nctx.fillStyle = '#fff'; nctx.fillText(n.name, L[0], L[1] - S.oy - 1); nctx.textAlign = 'left';
       }
     });
   }
@@ -2726,18 +2771,25 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     $('npcHourTxt').textContent = hhmm(hour);
     $('npcScenes').textContent = scenes.length ? 'Escenas de este mapa: ' + scenes.filter(function (s, k) { return scenes.indexOf(s) === k; }).map(sceneName).join(', ') : 'Este mapa no corresponde a ninguna escena fija.';
     body.innerHTML = '';
-    var rows = 0;
-    npcData.forEach(function (n, i) {
-      var visits = n.scheds.map(function (s) { return !!s && s.some(function (e) { return scenes.indexOf(e.path.scene) >= 0; }); });
-      if (!visits.some(Boolean)) return;
-      rows++;
+    // Primero los que pasan por estas escenas en algún horario; después el resto, atenuados.
+    var visits = npcData.map(function (n) { return n.scheds.map(function (s) { return !!s && s.some(function (e) { return scenes.indexOf(e.path.scene) >= 0; }); }); });
+    var here = [], away = [];
+    npcData.forEach(function (n, i) { (visits[i].some(Boolean) ? here : away).push(i); });
+    function sep(txt) { var tr = document.createElement('tr'); tr.innerHTML = '<td colspan="4" style="color:var(--muted);padding:6px"></td>'; tr.firstChild.textContent = txt; body.appendChild(tr); }
+    if (!here.length) sep('Ningún NPC con horario pasa por esta escena.');
+    here.concat(away).forEach(function (i, pos) {
+      if (pos === here.length && away.length) sep('No pasan por esta escena en ningún horario:');
+      addRow(npcData[i], i, visits[i]);
+    });
+    function addRow(n, i, visits) {
       var sc = npcSched(i, scenes), act = sc ? activeEntry(sc, hour) : -1, e = sc && sc[act];
       var tr = document.createElement('tr'), sel = document.createElement('select');
       if (npcSel === i) tr.className = 'selected';
       if (!sc || !sc.some(function (x) { return scenes.indexOf(x.path.scene) >= 0; })) tr.classList.add('dim');
       tr.innerHTML = '<td></td><td></td><td></td><td class="mono"></td>';
-      var spr = document.createElement('canvas'); spr.width = 16; spr.height = 40; spr.className = 'npcspr';
-      spr.getContext('2d').drawImage(n.sprite, 0, 0); tr.children[0].appendChild(spr);
+      var spr = document.createElement('canvas'), S0 = n.sprites[0]; spr.className = 'npcspr';
+      if (S0) { spr.width = S0.c.width; spr.height = S0.c.height; spr.getContext('2d').drawImage(S0.c, 0, 0); }
+      tr.children[0].appendChild(spr);
       tr.children[1].innerHTML = '<span></span><br><span class="mono" style="color:var(--muted)"></span>';
       tr.children[1].firstChild.textContent = n.name; tr.children[1].firstChild.style.color = n.color;
       tr.children[1].lastChild.textContent = '0x' + n.id.toString(16).toUpperCase();
@@ -2757,8 +2809,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
         if (npcSel === i && e && scenes.indexOf(e.path.scene) >= 0) { var L = e.path.pts[e.path.pts.length - 1]; scrollToCell(L[0] / TILE, L[1] / TILE); }
       });
       body.appendChild(tr);
-    });
-    if (!rows) body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:8px">Ningún NPC con horario pasa por esta escena.</td></tr>';
+    }
   }
   $('showNpcs').addEventListener('change', drawNpcs);
   $('npcHour').addEventListener('input', function () { renderNpcPanel(); drawNpcs(); });
