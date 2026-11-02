@@ -73,6 +73,15 @@ input[type=text] { width: 100%; }
 .stage { position: relative; display: inline-block; vertical-align: top; }
 #ovl, #warpovl { position: absolute; left: 0; top: 0; pointer-events: none; }
 #warpovl { z-index: 5; }
+#npcovl { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 6; }
+.warpedit { margin-top: 8px; padding: 8px; border: 1px solid var(--warp-color); border-radius: 4px; font-size: 12px; }
+.warpedit .row + .row { margin-top: 6px; }
+.warpedit input[type=number] { width: 64px; }
+.warpedit select { max-width: 220px; }
+table.warptable canvas.npcspr { width: 16px; height: 40px; image-rendering: pixelated; display: block; }
+table.warptable tr.dim td { opacity: .55; }
+table.warptable td input.mapnum { width: 54px; }
+table.warptable td input.mapnum.changed { border-color: var(--sel); }
 .types-wrap, .warps-wrap { overflow-x: auto; max-height: 280px; overflow-y: auto; border: 1px solid var(--line); border-radius: 4px; }
 table.types, table.warptable { border-collapse: collapse; width: 100%; font-size: 12px; }
 table.types th, table.warptable th { position: sticky; top: 0; background: var(--panel-2); text-align: left; padding: 4px 6px; font-weight: 600; z-index: 1; }
@@ -151,6 +160,7 @@ textarea { width: 100%; height: 90px; font-family: var(--mono); font-size: 11px;
         <canvas id="map" tabindex="0" aria-label="Mapa"></canvas>
         <canvas id="ovl" aria-hidden="true"></canvas>
         <canvas id="warpovl" aria-hidden="true"></canvas>
+        <canvas id="npcovl" aria-hidden="true"></canvas>
         <div id="cur"></div>
       </div>
     </div>
@@ -261,7 +271,37 @@ textarea { width: 100%; height: 90px; font-family: var(--mono); font-size: 11px;
         <button type="button" id="addWarpBtn" class="warp-btn">+ Pintar evento</button>
         <span class="mono" id="warpCount"></span>
       </div>
-      <p class="hint">Se leen de la colisión real y enlazan con scripts: «Evento» = celda que ejecuta el script N al pisarla (salidas del mapa); «Entrada» = objeto cuyo script (objeto ÷ 2) hace Warp_Player (puertas). El destino es la escena del juego, no el índice de la tabla de mapas. «+ Pintar evento» crea un tipo de celda que ejecuta ese script.</p>
+      <div class="warpedit" id="warpEdit" hidden></div>
+      <p class="hint">Se leen de la colisión real y enlazan con scripts: «Evento» = celda que ejecuta el script N al pisarla (salidas del mapa); «Entrada» = objeto cuyo script (objeto ÷ 2) hace Warp_Player (puertas). El destino es la escena del juego, no el índice de la tabla de mapas. «+ Pintar evento» crea un tipo de celda que ejecuta ese script. Con una ROM abierta, elige una fila para cambiar el Warp_Player(escena, x, y) del script: se reescribe su bytecode al inyectar.</p>
+    </section>
+
+    <section class="panel" id="npcpanel" hidden>
+      <h2>NPC y rutas diarias</h2>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="showNpcs" checked> Mostrar NPC</label>
+        <label>Hora <input type="range" id="npcHour" min="0" max="1079" value="360" aria-label="Hora del día"></label>
+        <span class="mono" id="npcHourTxt">12:00</span>
+      </div>
+      <div class="status" id="npcScenes"></div>
+      <div class="warps-wrap">
+        <table class="warptable">
+          <thead><tr><th></th><th>NPC</th><th>Horario</th><th>A esa hora</th></tr></thead>
+          <tbody id="npcBody"></tbody>
+        </table>
+      </div>
+      <p class="hint">Horarios leídos de la ROM (ScheduleInfo de cada NPC, func_0803D7E4). Cada tramo empieza a una hora en una escena y recorre su ruta en píxeles; el sprite se dibuja al final del tramo activo a esa hora. Pulsa un NPC para ver todos sus tramos en esta escena. El juego elige el horario según el día (función select de cada NPC).</p>
+    </section>
+
+    <section class="panel" id="scenepanel" hidden>
+      <h2>Escenas → mapa</h2>
+      <div class="status" id="sceneCur"></div>
+      <div class="warps-wrap" style="max-height:220px">
+        <table class="warptable">
+          <thead><tr><th>Escena</th><th>Variante</th><th>Mapa</th></tr></thead>
+          <tbody id="sceneBody"></tbody>
+        </table>
+      </div>
+      <p class="hint">Los warps llevan a escenas; cada escena elige su mapa con func_0803A8A4 (método virtual de la escena, resultado en [escena+4]). Cambiar aquí el número reescribe el <span class="mono">movs r0, #mapa</span> de esa escena (0–255), así que una escena puede cargar un mapa nuevo (66 en adelante). Las escenas 44–46 comparten instrucción. Se escribe al inyectar.</p>
     </section>
 
     <section class="panel">
@@ -408,6 +448,8 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   var SCRIPTS = (window.SCRIPT_INFO && SCRIPT_INFO.scripts) || {}, SCENES = (window.SCRIPT_INFO && SCRIPT_INFO.scenes) || {};
   function sceneName(id) { return '0x' + id.toString(16).toUpperCase() + (SCENES[id] ? ' ' + SCENES[id] : ''); }
   function warpText(sc) {
+    var ws = warpsOf(sc);
+    if (ws) return ws.map(function (w) { return sceneName(w.scene) + ' (' + w.x + ',' + w.y + ')'; }).join(' | ');
     var inf = SCRIPTS[sc];
     if (!inf || !inf.w) return '';
     return inf.w.map(function (w) { return sceneName(w[0]) + ' (' + w[1] + ',' + w[2] + ')'; }).join(' | ');
@@ -548,6 +590,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   var map = $('map'), mctx = map.getContext('2d');
   var ovl = $('ovl'), octx2 = ovl.getContext('2d');
   var warpOvl = $('warpovl'), wctx = warpOvl.getContext('2d');
+  var npcOvl = $('npcovl'), nctx = npcOvl.getContext('2d');
   var off = document.createElement('canvas'), octx = off.getContext('2d'), img;
 
   function setupMapCanvas() {
@@ -555,6 +598,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     map.width = off.width; map.height = off.height;
     ovl.width = off.width; ovl.height = off.height;
     warpOvl.width = off.width; warpOvl.height = off.height;
+    npcOvl.width = off.width; npcOvl.height = off.height;
     img = octx.createImageData(off.width, off.height);
     applyZoom();
     $('mw').value = st.w; $('mh').value = st.h;
@@ -565,6 +609,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     map.style.width = cw; map.style.height = ch;
     ovl.style.width = cw; ovl.style.height = ch;
     warpOvl.style.width = cw; warpOvl.style.height = ch;
+    npcOvl.style.width = cw; npcOvl.style.height = ch;
   }
 
   function drawCell(cx, cy) {
@@ -877,6 +922,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
 
   function drawWarpOverlay() {
     wctx.clearRect(0, 0, warpOvl.width, warpOvl.height);
+    drawNpcs();
     if (st && $('showGrid').checked) {
       wctx.strokeStyle = 'rgba(0,0,0,.35)'; wctx.lineWidth = 1; wctx.beginPath();
       for (var gx = 0; gx <= st.w; gx += 2) { wctx.moveTo(gx * TILE + .5, 0); wctx.lineTo(gx * TILE + .5, st.h * TILE); }
@@ -900,6 +946,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     var list = st.warpCache = collectWarps(), tbody = $('warpTableBody');
     if (selectedWarpIdx >= list.length) selectedWarpIdx = -1;
     drawWarpOverlay();
+    renderWarpEditor();
     tbody.innerHTML = '';
     var nEv = list.filter(function (w) { return w.kind === 'ev'; }).length, nDoor = list.filter(function (w) { return w.kind === 'door'; }).length;
     $('warpCount').textContent = nEv + ' eventos · ' + nDoor + ' entradas · ' + (list.length - nEv - nDoor) + ' objetos';
@@ -920,6 +967,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     var rows = $('warpTableBody').children;
     for (var i = 0; i < rows.length; i++) rows[i].classList.toggle('selected', i === idx);
     drawWarpOverlay();
+    renderWarpEditor();
   }
 
   function getWarpAt(x, y) {
@@ -2272,7 +2320,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   function injectInto(base) {
     commitCurrentToLib();
     var ed = libOrder.filter(function (i) { return lib[i].edited; });
-    if (!ed.length) throw new Error('No hay mapas editados');
+    if (!ed.length && !pendingRomEdits()) throw new Error('No hay mapas, warps ni escenas editados');
 
     var out = expandTo32MB(base);
     var end = out.length, pos, start, keys = ['tileset', 'palette_a', 'palette_b', 'layer0', 'layer1', 'layer2'], log = [];
@@ -2330,9 +2378,10 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
       keys.concat(m.collision ? ['collision'] : []).forEach(function (k) { if (chk[k] !== m[k]) throw new Error('mapa ' + i + ': verificación fallida en ' + k); });
       log.push((isNew ? 'Mapa NUEVO ' : 'Mapa ') + i + ': ' + m.width + '×' + m.height + ', ' + wrote + ' bytes nuevos');
     });
+    applyRomEdits(out, put, log);
     log.push('Espacio libre usado: ' + (pos - start) + ' bytes');
     log.push('Tamaño final de la ROM expandida: ' + (out.length / 1024 / 1024) + ' MB');
-    if (total > count) log.push('Nota: los mapas nuevos existen en la tabla (índices ' + count + '–' + (total - 1) + '), pero el juego solo los carga si un script o warp usa ese índice.');
+    if (total > count) log.push('Nota: los mapas nuevos existen en la tabla (índices ' + count + '–' + (total - 1) + '), pero el juego solo los carga si una escena apunta a ese índice (panel «Escenas → mapa»).');
     return { rom: out, log: log };
   }
 
@@ -2361,7 +2410,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
 
   function runInject(base, name) {
     commitCurrentToLib(); renderList();
-    if (!libOrder.some(function (i) { return lib[i].edited; })) {
+    if (!libOrder.some(function (i) { return lib[i].edited; }) && !pendingRomEdits()) {
       $('out').value = 'No hay mapas editados todavía. Edita un mapa y vuelve a pulsar «Inyectar en ROM…».';
       $('outpanel').hidden = false; toast('No hay mapas editados todavía'); return;
     }
@@ -2373,7 +2422,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
       document.body.appendChild(a); a.click(); a.remove();
       $('out').value = r.log.join('\n'); $('outpanel').hidden = false;
       renderList(); toast('ROM generada de 32MB: ' + a.download);
-      romBytes = r.rom; FomtHub.publish(r.rom, a.download);
+      romBytes = r.rom; resetRomEdits(r.rom); FomtHub.publish(r.rom, a.download);
     } catch (err) { $('out').value = 'Error al inyectar: ' + err.message; $('outpanel').hidden = false; toast('Error: ' + err.message); }
   }
 
@@ -2419,6 +2468,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     }
     if (!items.length) { toast('No parece la ROM de FOMT: ' + bad[0]); return; }
     romBytes = rom; romName = name;
+    resetRomEdits(rom);
     lib = {}; libOrder = []; libCur = null;
     ingest(items, bad);
     $('source').textContent = 'ROM ' + name + ' (' + (rom.length / 1024 / 1024).toFixed(1) + 'MB) · ' + items.length + ' mapas';
@@ -2495,6 +2545,394 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
 
   $('romBtn').addEventListener('click', function () { $('romfile').click(); });
   $('romfile').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; if (f) loadRomFile(f); });
+
+  /* ---------- ESCENA → MAPA (func_0803A8A4) ---------- */
+  /* Cada escena tiene en [escena+0x90] una vtable cuya entrada +0x18 (func_080A6420 / func_080AAF3C) llama a
+     func_0803A8A4(escena, estación, nivel casa, nivel gallinero, nivel establo); func_080A5760 guarda el resultado
+     en [escena+4] y con él GetMapData elige el mapa. Para las escenas 0..51 la función salta por la tabla 0x0803A91C
+     a un «movs r0, #mapa». Estas son las direcciones de esos movs (sacadas emulando la función con todas las
+     combinaciones); la variante «invierno» es estación == 3. Las minas (52..563) se calculan y no están aquí. */
+  var SCENE_MAP = [
+    [[0x3AA3C, "invierno"], [0x3AA42, "resto del año"]], [[0x3AA1C, "invierno"], [0x3AA24, "resto del año"]], [[0x3A9EC, "resto del año"], [0x3A9F4, "invierno"]], [[0x3AA28, "invierno"], [0x3AA2E, "resto del año"]],
+    [[0x3AA32, "invierno"], [0x3AA38, "resto del año"]], [[0x3AA04, "invierno"], [0x3AA0C, "resto del año"]], [[0x3A9F8, "invierno"], [0x3AA00, "resto del año"]], [[0x3AA10, "invierno"], [0x3AA18, "resto del año"]],
+    [[0x3AA46, "invierno"], [0x3AA4C, "resto del año"]], [[0x3AAD6, ""]], [[0x3AADA, ""]], [[0x3AADE, ""]],
+    [[0x3AAC2, ""]], [[0x3AAB6, ""]], [[0x3AAF6, ""]], [[0x3AAAA, ""]],
+    [[0x3AAAE, ""]], [[0x3AA5A, "gallinero nv.1"], [0x3AA5E, "gallinero nv.2"]], [[0x3AAFE, ""]], [[0x3AABA, ""]],
+    [[0x3AABE, ""]], [[0x3AA9E, ""]], [[0x3AAA2, ""]], [[0x3AAA6, ""]],
+    [[0x3AAC6, ""]], [[0x3AACA, ""]], [[0x3AACE, ""]], [[0x3AAD2, ""]],
+    [[0x3AAFA, ""]], [[0x3AA82, "casa nv.1"], [0x3AA86, "casa nv.2"], [0x3AA8A, "casa nv.3"]], [[0x3AAF2, ""]], [[0x3AA8E, ""]],
+    [[0x3AA92, ""]], [[0x3AA96, ""]], [[0x3AA9A, ""]], [[0x3AB02, ""]],
+    [[0x3AAB2, ""]], [[0x3AA6C, "establo nv.1"], [0x3AA70, "establo nv.2"]], [[0x3AAEA, ""]], [[0x3AB06, ""]],
+    [[0x3AAEE, ""]], [[0x3AAE2, ""]], [[0x3AAE6, ""]], [[0x3AB0A, ""]],
+    [[0x3AB1E, "compartida 44–46"]], [[0x3AB1E, "compartida 44–46"]], [[0x3AB1E, "compartida 44–46"]], [[0x3AB22, ""]],
+    [[0x3AB0E, ""]], [[0x3AB12, ""]], [[0x3AB16, ""]], [[0x3AB1A, ""]]
+  ];
+  var sceneMapEdits = {}; // dirección del movs -> índice de mapa pendiente de inyectar
+
+  function sceneMapAt(rom, off) {
+    if (sceneMapEdits[off] !== undefined) return sceneMapEdits[off];
+    return rom && rom[off + 1] === 0x20 ? rom[off] : -1; // 0x20 = movs r0, #imm8
+  }
+  function scenesOfMap(idx) {
+    var out = [];
+    SCENE_MAP.forEach(function (v, sc) {
+      v.forEach(function (e) { if (sceneMapAt(romBytes, e[0]) === idx) out.push({ scene: sc, off: e[0], label: e[1] }); });
+    });
+    return out;
+  }
+
+  function renderScenePanel() {
+    var panel = $('scenepanel');
+    panel.hidden = !romBytes || !st;
+    if (panel.hidden) return;
+    var here = scenesOfMap(st.index), body = $('sceneBody'), top = body.parentNode.parentNode.scrollTop;
+    $('sceneCur').textContent = here.length
+      ? 'Este mapa lo cargan: ' + here.map(function (s) { return sceneName(s.scene) + (s.label ? ' (' + s.label + ')' : ''); }).join(', ')
+      : 'Ninguna escena fija carga este mapa (puede ser de minas, de un evento o nuevo).';
+    body.innerHTML = '';
+    SCENE_MAP.forEach(function (v, sc) {
+      v.forEach(function (e, k) {
+        var cur = sceneMapAt(romBytes, e[0]), tr = document.createElement('tr'), inp = document.createElement('input');
+        if (cur === st.index) tr.className = 'cur';
+        tr.innerHTML = '<td></td><td></td><td></td>';
+        tr.children[0].textContent = k ? '' : sceneName(sc);
+        tr.children[1].textContent = e[1] || '—';
+        inp.type = 'number'; inp.min = 0; inp.max = 255; inp.value = cur; inp.className = 'mapnum' + (sceneMapEdits[e[0]] !== undefined ? ' changed' : '');
+        inp.title = 'movs r0, #mapa en 0x' + (0x08000000 + e[0]).toString(16).toUpperCase();
+        inp.addEventListener('change', function () {
+          var nv = Math.max(0, Math.min(255, +inp.value | 0));
+          if (nv === romBytes[e[0]]) delete sceneMapEdits[e[0]]; else sceneMapEdits[e[0]] = nv;
+          if (lib[nv] === undefined) toast('Ojo: el mapa ' + nv + ' no existe todavía en la tabla');
+          renderScenePanel(); npcLastMap = null; drawNpcs();
+        });
+        tr.children[2].appendChild(inp);
+        body.appendChild(tr);
+      });
+    });
+    body.parentNode.parentNode.scrollTop = top;
+  }
+
+  /* ---------- NPC Y RUTAS DIARIAS ---------- */
+  /* func_0803D7E4 crea un horario por NPC: ScheduleInfo {select, n, Schedule*[n]}; Schedule {n, ScheduleEntry*};
+     ScheduleEntry {hora (min desde las 6:00), PathInfo*}; PathInfo {puntos*, n, x, y (px), escena:10 orientación:2
+     tipoB:1}. Cada punto fija la nueva x o la nueva y (bit «is_y»). Ver StanHash_fomt include/schedule_info.hh.
+     [id del NPC, ScheduleInfo, nombre, sprite 4bpp, paleta]: el id y el ScheduleInfo salen de los constructores de
+     code_entities_08034CEC.s; el nombre, de su ID de animación. El sprite es la pose de frente (tiles 0..9, 16×40). */
+  var NPC_TABLE = [
+    [0x3E0, 0x80F1A80, "Rick", 0x5FA73C, 0x662440], [0x3E1, 0x80F1FC0, "Popuri", 0x5FC83C, 0x662480], [0x3E2, 0x80F280C, "Lillia", 0x5FFFBC, 0x6624E0],
+    [0x3E3, 0x80F29C0, "Bebé", 0x601F5C, 0x662500], [0x3E4, 0x80F2AF8, "Cliff", 0x60201C, 0x662520], [0x3E5, 0x80F2DC0, "Zack", 0x60E43C, 0x6625C0],
+    [0x3E6, 0x80F3010, "Doctor", 0x60F1BC, 0x6625E0], [0x3EE, 0x80F33B8, "Ellen", 0x62239C, 0x662A80], [0x3EF, 0x80F3408, "Jeff", 0x62251C, 0x662AA0],
+    [0x3F0, 0x80F35E4, "Karen", 0x62329C, 0x662AC0], [0x3F1, 0x80F3FD8, "Sasha", 0x62761C, 0x662B20], [0x3F2, 0x80F42F0, "Doug", 0x63499C, 0x662D20],
+    [0x3F3, 0x80F43DC, "Ann", 0x635B9C, 0x662D40], [0x3F4, 0x80F4974, "Lou", 0x63979C, 0x662DA0], [0x3F5, 0x80F49C0, "Basil", 0x63B59C, 0x662E00],
+    [0x3F6, 0x80F4D74, "Mary", 0x63C31C, 0x662E20], [0x3F7, 0x80F5540, "Anna", 0x64057C, 0x662E80], [0x3F8, 0x80F597C, "Won", 0x64177C, 0x662EA0],
+    [0x3F9, 0x80F59CC, "Thomas", 0x6424FC, 0x662EC0], [0x3FA, 0x80F5D94, "Elli", 0x643E7C, 0x662F20], [0x3FB, 0x80F61FC, "Stu", 0x647A7C, 0x662F80],
+    [0x3FC, 0x80F6370, "Duke", 0x64813C, 0x662FA0], [0x3FD, 0x80F66C4, "Manna", 0x6494BC, 0x662FC0], [0x3FE, 0x80F6B10, "Van", 0x64A23C, 0x662FE0],
+    [0x3FF, 0x80F6B4C, "Harris", 0x64B83C, 0x663000], [0x400, 0x80F6DE8, "Carter", 0x64C5BC, 0x663020], [0x401, 0x80F6FF8, "Kai", 0x64D93C, 0x663080],
+    [0x402, 0x80F7294, "Gray", 0x659CBC, 0x6630C0], [0x403, 0x80F77FC, "Saibara", 0x65BC3C, 0x663100], [0x404, 0x80F7B40, "Gotz", 0x65E4BC, 0x6631A0],
+    [0x405, 0x80F81BC, "May", 0x6602BC, 0x6631C0], [0x406, 0x80F8678, "Barley", 0x66103C, 0x6631E0]
+  ];
+  var npcData = null, npcVariant = {}, npcSel = -1, npcLastMap = null;
+
+  function readNpcPath(rom, a) {
+    var p = u32(rom, a) & 0x1FFFFFF, n = u16(rom, a + 4), h = u16(rom, a + 10), typeB = (h >> 12) & 1;
+    var pts = [[u16(rom, a + 6), u16(rom, a + 8)]];
+    for (var i = 0; p && i < n; i++) {
+      var q = p + i * 8, hi = u32(rom, q + 4), isY = typeB ? (hi >> 18) & 1 : hi & 1;
+      var v = typeB ? u16(rom, q) : (u16(rom, q + 2) << 16) >> 16, last = pts[pts.length - 1];
+      pts.push(isY ? [last[0], v] : [v, last[1]]);
+    }
+    return { addr: a, scene: h & 0x3FF, face: (h >> 10) & 3, typeB: typeB, pts: pts };
+  }
+  function npcSprite(rom, g, p) {
+    var c = document.createElement('canvas'); c.width = 16; c.height = 40;
+    var cx = c.getContext('2d'), im = cx.createImageData(16, 40), pal = [];
+    for (var i = 0; i < 16; i++) pal.push(rgbOf(u16(rom, p + i * 2)));
+    for (var t = 0; t < 10; t++) for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) {
+      var b = rom[g + t * 32 + y * 4 + (x >> 1)], v = (x & 1) ? b >> 4 : b & 15, o = (((t >> 1) * 8 + y) * 16 + (t & 1) * 8 + x) * 4;
+      if (!v) continue;
+      im.data[o] = pal[v][0]; im.data[o + 1] = pal[v][1]; im.data[o + 2] = pal[v][2]; im.data[o + 3] = 255;
+    }
+    cx.putImageData(im, 0, 0);
+    return c;
+  }
+  function readNpcs(rom) {
+    return NPC_TABLE.map(function (r, i) {
+      var si = r[1] & 0x1FFFFFF, n = Math.min(64, u32(rom, si + 4)), sa = u32(rom, si + 8) & 0x1FFFFFF, scheds = [];
+      for (var k = 0; k < n; k++) {
+        var s = u32(rom, sa + k * 4) & 0x1FFFFFF;
+        if (!s) { scheds.push(null); continue; }
+        var ne = u16(rom, s), ea = u32(rom, s + 4) & 0x1FFFFFF, ents = [];
+        for (var j = 0; j < ne; j++) ents.push({ t: u16(rom, ea + j * 8), path: readNpcPath(rom, u32(rom, ea + j * 8 + 4) & 0x1FFFFFF) });
+        scheds.push(ents);
+      }
+      var def = -1;
+      scheds.some(function (s, k) { if (s) { def = k; return true; } return false; });
+      return { id: r[0], name: r[2], scheds: scheds, def: def, sprite: npcSprite(rom, r[3], r[4]), color: 'hsl(' + (i * 47 % 360) + ',90%,55%)' };
+    });
+  }
+  function hhmm(t) { var m = 360 + t; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+  // Horario que se muestra: el elegido o, por defecto, el primero que pasa por alguna escena de este mapa.
+  function npcVariantOf(i, scenes) {
+    if (npcVariant[i] !== undefined) return npcVariant[i];
+    var n = npcData[i], k = -1;
+    n.scheds.some(function (s, j) { if (s && s.some(function (e) { return scenes.indexOf(e.path.scene) >= 0; })) { k = j; return true; } return false; });
+    return k >= 0 ? k : n.def;
+  }
+  function npcSched(i, scenes) { var k = npcVariantOf(i, scenes); return k >= 0 ? npcData[i].scheds[k] : null; }
+  function activeEntry(sc, t) { var a = -1; sc.forEach(function (e, j) { if (e.t <= t) a = j; }); return a; }
+
+  function drawNpcs() {
+    nctx.clearRect(0, 0, npcOvl.width, npcOvl.height);
+    if (!st) return;
+    var key = st.index + '|' + !!npcData;
+    if (npcLastMap !== key) { npcLastMap = key; npcSel = -1; npcVariant = {}; renderNpcPanel(); renderScenePanel(); }
+    if (!npcData || !$('showNpcs').checked) return;
+    var scenes = scenesOfMap(st.index).map(function (s) { return s.scene; }), hour = +$('npcHour').value;
+    function here(e) { return scenes.indexOf(e.path.scene) >= 0; }
+    nctx.lineJoin = 'round';
+    npcData.forEach(function (n, i) {
+      var sc = npcSched(i, scenes); if (!sc) return;
+      var act = activeEntry(sc, hour), sel = npcSel === i;
+      if (npcSel >= 0 && !sel) return;
+      sc.forEach(function (e, j) {
+        if (!here(e) || (!sel && j !== act)) return;
+        var P = e.path.pts, on = j === act;
+        nctx.globalAlpha = on ? 1 : 0.55;
+        nctx.strokeStyle = n.color; nctx.lineWidth = on ? 2 : 1;
+        nctx.beginPath(); nctx.moveTo(P[0][0] + 0.5, P[0][1] + 0.5);
+        for (var k = 1; k < P.length; k++) nctx.lineTo(P[k][0] + 0.5, P[k][1] + 0.5);
+        nctx.stroke();
+        nctx.fillStyle = n.color; nctx.fillRect(P[0][0] - 2, P[0][1] - 2, 4, 4);
+        var L = P[P.length - 1]; nctx.strokeRect(L[0] - 2.5, L[1] - 2.5, 5, 5);
+        if (sel) { nctx.font = 'bold 7px "JetBrains Mono", monospace'; nctx.textBaseline = 'bottom'; nctx.fillText(hhmm(e.t), P[0][0] + 3, P[0][1] - 1); }
+      });
+      nctx.globalAlpha = 1;
+      var e = sc[act];
+      if (e && here(e)) {
+        var L = e.path.pts[e.path.pts.length - 1];
+        nctx.drawImage(n.sprite, L[0] - 8, L[1] - 36);
+        nctx.font = 'bold 7px "JetBrains Mono", monospace'; nctx.textAlign = 'center'; nctx.textBaseline = 'bottom';
+        nctx.lineWidth = 2; nctx.strokeStyle = 'rgba(0,0,0,.8)'; nctx.strokeText(n.name, L[0], L[1] - 36);
+        nctx.fillStyle = '#fff'; nctx.fillText(n.name, L[0], L[1] - 36); nctx.textAlign = 'left';
+      }
+    });
+  }
+
+  function renderNpcPanel() {
+    var panel = $('npcpanel');
+    panel.hidden = !npcData || !st;
+    if (panel.hidden) return;
+    var scenes = scenesOfMap(st.index).map(function (s) { return s.scene; }), hour = +$('npcHour').value, body = $('npcBody');
+    $('npcHourTxt').textContent = hhmm(hour);
+    $('npcScenes').textContent = scenes.length ? 'Escenas de este mapa: ' + scenes.filter(function (s, k) { return scenes.indexOf(s) === k; }).map(sceneName).join(', ') : 'Este mapa no corresponde a ninguna escena fija.';
+    body.innerHTML = '';
+    var rows = 0;
+    npcData.forEach(function (n, i) {
+      var visits = n.scheds.map(function (s) { return !!s && s.some(function (e) { return scenes.indexOf(e.path.scene) >= 0; }); });
+      if (!visits.some(Boolean)) return;
+      rows++;
+      var sc = npcSched(i, scenes), act = sc ? activeEntry(sc, hour) : -1, e = sc && sc[act];
+      var tr = document.createElement('tr'), sel = document.createElement('select');
+      if (npcSel === i) tr.className = 'selected';
+      if (!sc || !sc.some(function (x) { return scenes.indexOf(x.path.scene) >= 0; })) tr.classList.add('dim');
+      tr.innerHTML = '<td></td><td></td><td></td><td class="mono"></td>';
+      var spr = document.createElement('canvas'); spr.width = 16; spr.height = 40; spr.className = 'npcspr';
+      spr.getContext('2d').drawImage(n.sprite, 0, 0); tr.children[0].appendChild(spr);
+      tr.children[1].innerHTML = '<span></span><br><span class="mono" style="color:var(--muted)"></span>';
+      tr.children[1].firstChild.textContent = n.name; tr.children[1].firstChild.style.color = n.color;
+      tr.children[1].lastChild.textContent = '0x' + n.id.toString(16).toUpperCase();
+      n.scheds.forEach(function (s, k) {
+        if (!s) return;
+        var o = document.createElement('option'); o.value = k;
+        o.textContent = (visits[k] ? '★ ' : '') + 'Horario ' + k + ' · ' + s.length + ' tramos';
+        if (k === npcVariantOf(i, scenes)) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('click', function (ev) { ev.stopPropagation(); });
+      sel.addEventListener('change', function () { npcVariant[i] = +sel.value; renderNpcPanel(); drawNpcs(); });
+      tr.children[2].appendChild(sel);
+      tr.children[3].textContent = e ? hhmm(e.t) + ' ' + sceneName(e.path.scene) + ' (' + e.path.pts[e.path.pts.length - 1].join(',') + ')' : '—';
+      tr.addEventListener('click', function () {
+        npcSel = npcSel === i ? -1 : i; renderNpcPanel(); drawNpcs();
+        if (npcSel === i && e && scenes.indexOf(e.path.scene) >= 0) { var L = e.path.pts[e.path.pts.length - 1]; scrollToCell(L[0] / TILE, L[1] / TILE); }
+      });
+      body.appendChild(tr);
+    });
+    if (!rows) body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:8px">Ningún NPC con horario pasa por esta escena.</td></tr>';
+  }
+  $('showNpcs').addEventListener('change', drawNpcs);
+  $('npcHour').addEventListener('input', function () { renderNpcPanel(); drawNpcs(); });
+
+  /* ---------- SCRIPTS: WARP_PLAYER EXACTO ---------- */
+  /* Tabla de scripts 0xF89D8 (1328 punteros a RIFF/«SCR » con trozos CODE, STR y JUMP, como en textos_npc.html).
+     Un warp es «push escena; push x; push y; call 0x16». Si los valores nuevos caben en los push originales se
+     reescriben en su sitio; si no, se salta (0x18) a un bloque añadido al final del CODE con push más anchos y se
+     vuelve detrás de la llamada, y el script reconstruido va al espacio libre con su puntero de la tabla repuntado. */
+  var SCR_TABLE = 0xF89D8, SCR_COUNT = 1328;
+  var SCR_OPSZ = { 0x17: 5, 0x13: 5, 0x14: 5, 0x18: 5, 0x19: 5, 0x1A: 5, 0x1B: 5, 0x1C: 5, 0x1D: 5, 0x1E: 5, 0x21: 5, 0x24: 5, 0x22: 3, 0x23: 2 };
+  var SCR_PUSH = [0x23, 0x22, 0x17], SCR_JUMPS = [0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E], CALL_WARP = 0x16;
+  var warpEdits = {}, romWarpCache = {};
+
+  function asc4(b, o) { return String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]); }
+  function readScript(rom, id) {
+    var off = u32(rom, SCR_TABLE + id * 4) & 0x1FFFFFF;
+    if (!off || off + 12 > rom.length || asc4(rom, off) !== 'RIFF' || asc4(rom, off + 8) !== 'SCR ') return null;
+    var end = off + u32(rom, off + 4), o = off + 12, ch = [];
+    while (o + 8 <= end) {
+      var mg = asc4(rom, o), l = u32(rom, o + 4);
+      if (['CODE', 'STR ', 'JUMP'].indexOf(mg) < 0) break;
+      ch.push({ mg: mg, at: o + 8, d: rom.slice(o + 8, o + 8 + l) }); o += 8 + l;
+    }
+    return { off: off, ch: ch };
+  }
+  function chunkOf(s, mg) { for (var i = 0; i < s.ch.length; i++) if (s.ch[i].mg === mg) return s.ch[i]; return null; }
+  function decodeScript(code) {
+    var out = [], pc = 0;
+    while (pc < code.length) {
+      var op = code[pc] & 0x7F, sz = SCR_OPSZ[op] || 1, arg = null;
+      if (sz > 1) { arg = 0; for (var k = sz - 1; k >= 1; k--) arg = arg * 256 + (code[pc + k] || 0); }
+      out.push({ pc: pc, op: op, arg: arg, sz: sz }); pc += sz;
+    }
+    return out;
+  }
+  function findWarpCalls(cc) {
+    var ins = decodeScript(cc.subarray(4, 4 + u32(cc, 0))), out = [];
+    for (var k = 3; k < ins.length; k++) {
+      if (ins[k].op !== 0x21 || ins[k].arg !== CALL_WARP) continue;
+      var a = ins.slice(k - 3, k);
+      if (a.every(function (I) { return SCR_PUSH.indexOf(I.op) >= 0; })) out.push({ scene: a[0].arg, x: a[1].arg, y: a[2].arg, push: a, call: ins[k] });
+    }
+    return out;
+  }
+  function romWarps(rom, id) {
+    var s = readScript(rom, id), cc = s && chunkOf(s, 'CODE');
+    return cc ? findWarpCalls(cc.d).map(function (w) { return { scene: w.scene, x: w.x, y: w.y }; }) : null;
+  }
+  // Warps del script id (con los cambios pendientes); null si no hay ROM o el script no hace Warp_Player.
+  function warpsOf(id) {
+    if (warpEdits[id]) return warpEdits[id];
+    if (!romBytes || id < 0 || id >= SCR_COUNT) return null;
+    if (!(id in romWarpCache)) romWarpCache[id] = romWarps(romBytes, id);
+    var w = romWarpCache[id];
+    return w && w.length ? w : null;
+  }
+  function pushBytes(v) { return v < 0x100 ? [0x23, v] : v < 0x10000 ? [0x22, v & 255, v >> 8] : [0x17, v & 255, (v >>> 8) & 255, (v >>> 16) & 255, v >>> 24]; }
+  function le32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, v >>> 24]; }
+
+  // Reescribe los Warp_Player del script id en out; devuelve una línea para el registro.
+  function patchScriptWarps(out, id, list, put) {
+    var s = readScript(out, id), cc = s && chunkOf(s, 'CODE'), jc = chunkOf(s || { ch: [] }, 'JUMP');
+    if (!cc) throw new Error('script ' + id + ': no se encuentra en la ROM');
+    var found = findWarpCalls(cc.d);
+    if (found.length !== list.length) throw new Error('script ' + id + ': la ROM tiene ' + found.length + ' Warp_Player, se esperaban ' + list.length);
+    var n = u32(cc.d, 0), code = Array.prototype.slice.call(cc.d.subarray(4, 4 + n)), tail = cc.d.subarray(4 + n), grow = [];
+    found.forEach(function (f, k) {
+      var nv = [list[k].scene, list[k].x, list[k].y];
+      if (nv.some(function (v, j) { return pushBytes(v).length > f.push[j].sz; })) { grow.push(k); return; }
+      f.push.forEach(function (I, j) { for (var b = 1; b < I.sz; b++) code[I.pc + b] = Math.floor(nv[j] / Math.pow(256, b - 1)) & 255; });
+    });
+    if (grow.length) {
+      var targets = {};
+      decodeScript(cc.d.subarray(4, 4 + n)).forEach(function (I) { if (SCR_JUMPS.indexOf(I.op) >= 0) targets[I.arg] = 1; });
+      if (jc) for (var o = 0; o + 4 <= jc.d.length; o += 4) targets[u32(jc.d, o)] = 1;
+      grow.forEach(function (k) {
+        var f = found[k], pc0 = f.push[0].pc, pc1 = f.call.pc + f.call.sz;
+        for (var p = pc0 + 1; p < pc1; p++) if (targets[p]) throw new Error('script ' + id + ': un salto cae dentro del Warp_Player ' + k);
+        var block = code.length;
+        code = code.concat(pushBytes(list[k].scene), pushBytes(list[k].x), pushBytes(list[k].y), code.slice(f.call.pc, pc1), [0x18], le32(pc1));
+        code.splice.apply(code, [pc0, 5, 0x18].concat(le32(block)));
+      });
+    }
+    var newCC = new Uint8Array(4 + code.length + tail.length);
+    newCC.set(le32(code.length), 0); newCC.set(code, 4); newCC.set(tail, 4 + code.length);
+    var how;
+    if (!grow.length) { out.set(newCC, cc.at); how = 'reescrito en su sitio'; }
+    else {
+      var parts = [], body = 4;
+      s.ch.forEach(function (c) { var d = c === cc ? newCC : c.d; parts.push(c.mg, d); body += 8 + d.length; });
+      var blob = new Uint8Array(body + 8), q = 0;
+      function str(x) { for (var i = 0; i < 4; i++) blob[q++] = x.charCodeAt(i); }
+      str('RIFF'); blob.set(le32(body + 8), q); q += 4; str('SCR ');
+      for (var i = 0; i < parts.length; i += 2) { str(parts[i]); blob.set(le32(parts[i + 1].length), q); q += 4; blob.set(parts[i + 1], q); q += parts[i + 1].length; }
+      setU32(out, SCR_TABLE + id * 4, put(blob));
+      how = 'reubicado en 0x' + ((u32(out, SCR_TABLE + id * 4) & 0x1FFFFFF).toString(16).toUpperCase()) + ' (push más anchos)';
+    }
+    var back = romWarps(out, id);
+    if (!back || back.length !== list.length || back.some(function (w, k) { return w.scene !== list[k].scene || w.x !== list[k].x || w.y !== list[k].y; }))
+      throw new Error('script ' + id + ': verificación fallida al releer los warps');
+    return 'Script ' + id + ': ' + list.map(function (w) { return 'Warp_Player(' + sceneName(w.scene) + ', ' + w.x + ', ' + w.y + ')'; }).join(', ') + ' — ' + how + ', releído OK';
+  }
+
+  function pendingRomEdits() { return Object.keys(warpEdits).length + Object.keys(sceneMapEdits).length; }
+  function applyRomEdits(out, put, log) {
+    Object.keys(warpEdits).forEach(function (id) { log.push(patchScriptWarps(out, +id, warpEdits[id], put)); });
+    Object.keys(sceneMapEdits).forEach(function (off) {
+      off = +off;
+      if (out[off + 1] !== 0x20) throw new Error('0x' + off.toString(16) + ': no es «movs r0, #imm» (¿ROM distinta?)');
+      out[off] = sceneMapEdits[off];
+      var sc = []; SCENE_MAP.forEach(function (v, i) { v.forEach(function (e) { if (e[0] === off) sc.push(sceneName(i) + (e[1] ? ' (' + e[1] + ')' : '')); }); });
+      log.push(sc.join(', ') + ' → mapa ' + out[off] + ' (movs en 0x' + (0x08000000 + off).toString(16).toUpperCase() + ')');
+    });
+  }
+  // Tras inyectar, la ROM nueva pasa a ser la de referencia: se vacían los cambios y se relee todo de ella.
+  function resetRomEdits(rom) {
+    warpEdits = {}; sceneMapEdits = {}; romWarpCache = {};
+    try { npcData = readNpcs(rom); } catch (err) { npcData = null; }
+    npcLastMap = null;
+    if (st) { st.warpCache = null; renderWarps(); }
+  }
+
+  function renderWarpEditor() {
+    var box = $('warpEdit'), list = st && st.warpCache, w = list && list[selectedWarpIdx];
+    box.hidden = !w;
+    if (!w) return;
+    box.innerHTML = '';
+    var head = document.createElement('div'); head.className = 'row';
+    var ws = warpsOf(w.id);
+    head.textContent = (w.kind === 'ev' ? 'Evento' : w.kind === 'door' ? 'Entrada' : 'Objeto') + ' → script ' + w.id + (warpEdits[w.id] ? ' (cambios sin inyectar)' : '');
+    box.appendChild(head);
+    if (!romBytes) { box.appendChild(document.createTextNode('Abre la ROM para editar el Warp_Player de este script.')); return; }
+    if (!ws) { box.appendChild(document.createTextNode('Este script no hace Warp_Player.')); return; }
+    var orig = romWarps(romBytes, w.id) || [], inputs = [];
+    ws.forEach(function (v, k) {
+      var row = document.createElement('div'); row.className = 'row';
+      var sel = document.createElement('select'), x = document.createElement('input'), y = document.createElement('input');
+      Object.keys(SCENES).map(Number).sort(function (a, b) { return a - b; }).forEach(function (id) {
+        var o = document.createElement('option'); o.value = id; o.textContent = sceneName(id); sel.appendChild(o);
+      });
+      if (!SCENES[v.scene]) { var o = document.createElement('option'); o.value = v.scene; o.textContent = sceneName(v.scene); sel.appendChild(o); }
+      sel.value = v.scene;
+      [x, y].forEach(function (inp, j) { inp.type = 'number'; inp.min = 0; inp.max = 65535; inp.value = j ? v.y : v.x; });
+      var lab = document.createElement('span'); lab.className = 'mono'; lab.textContent = 'Warp ' + k + ':';
+      row.appendChild(lab); row.appendChild(sel);
+      row.appendChild(document.createTextNode(' x')); row.appendChild(x);
+      row.appendChild(document.createTextNode(' y')); row.appendChild(y);
+      if (orig[k] && (orig[k].scene !== v.scene || orig[k].x !== v.x || orig[k].y !== v.y)) {
+        var was = document.createElement('span'); was.className = 'mono'; was.style.color = 'var(--muted)';
+        was.textContent = 'ROM: ' + sceneName(orig[k].scene) + ' (' + orig[k].x + ',' + orig[k].y + ')'; row.appendChild(was);
+      }
+      inputs.push([sel, x, y]); box.appendChild(row);
+    });
+    var act = document.createElement('div'); act.className = 'row';
+    var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'warp-btn'; ok.textContent = 'Aplicar al script';
+    ok.addEventListener('click', function () {
+      var nl = inputs.map(function (r) { return { scene: Math.max(0, +r[0].value | 0), x: Math.max(0, Math.min(65535, +r[1].value | 0)), y: Math.max(0, Math.min(65535, +r[2].value | 0)) }; });
+      var same = nl.every(function (v, k) { return orig[k] && orig[k].scene === v.scene && orig[k].x === v.x && orig[k].y === v.y; });
+      if (same) delete warpEdits[w.id]; else warpEdits[w.id] = nl;
+      st.warpCache = null; renderWarps();
+      toast(same ? 'Script ' + w.id + ' sin cambios' : 'Script ' + w.id + ' cambiado: pulsa «Inyectar en ROM» para escribirlo');
+    });
+    act.appendChild(ok);
+    if (warpEdits[w.id]) {
+      var undoB = document.createElement('button'); undoB.type = 'button'; undoB.textContent = 'Volver al de la ROM';
+      undoB.addEventListener('click', function () { delete warpEdits[w.id]; st.warpCache = null; renderWarps(); });
+      act.appendChild(undoB);
+    }
+    var note = document.createElement('span'); note.className = 'mono'; note.style.color = 'var(--muted)';
+    note.textContent = 'x, y en píxeles; escena = ID de escena (ver «Escenas → mapa»)';
+    act.appendChild(note);
+    box.appendChild(act);
+  }
 
   /* ---------- MAPA SINTÉTICO INICIAL ---------- */
   function makeSample() {
