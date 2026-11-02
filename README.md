@@ -14,7 +14,7 @@ Abre **[`FoMT_Suite.html`](./FoMT_Suite.html)** con doble clic (Chrome, Edge o F
 | :--- | :--- | :--- |
 | **Mapas** | [`herramientas/mapas.html`](./herramientas/mapas.html) | Capas 0–2 y **capa 3 de edificios/muebles** (los parches que el juego pega según lo comprado), colisión, **warps con su destino real**, bloques 16×16 de 3 capas al estilo Advance Map, piezas (capturar por capas, edificios, PNG importados), tiles nuevos, **mapas nuevos**, exportar PNG e inyectar en la ROM (ampliada a 32 MB). |
 | **Textos, NPC y retratos** | [`herramientas/textos_npc.html`](./herramientas/textos_npc.html) | Traducción de diálogos, eventos nuevos, hablantes, retratos e importación de retratos desde imágenes; genera ROM e IPS. |
-| **Audio** | [`herramientas/audio.html`](./herramientas/audio.html) | Música y efectos de **FoMT (motor m4a/Sappy de GBA)** y de Harvest Moon DS (SDAT): reproducir, silenciar/solo por pista, velocidad, transposición, exportar WAV y MIDI, escuchar las muestras. |
+| **Audio** | [`herramientas/audio.html`](./herramientas/audio.html) | Música y efectos de **FoMT (motor m4a/Sappy de GBA)** y de Harvest Moon DS (SDAT): reproducir, silenciar/solo por pista, velocidad, transposición, exportar WAV y MIDI, escuchar las muestras. **Importar MIDI** a la ROM de GBA (canción o efecto nuevo, o reemplazar uno existente) con un voicegroup existente o uno nuevo con muestras WAV. |
 
 Cada herramienta también funciona sola. Se comunican con la suite por `postMessage` a través de [`herramientas/fomt-hub.js`](./herramientas/fomt-hub.js), así que no hace falta servidor ni compilar nada. Para añadir una herramienta nueva: crea su HTML en `herramientas/`, incluye `fomt-hub.js`, llama a `FomtHub.onRom(...)` para recibir la ROM y a `FomtHub.publish(...)` tras inyectar, y añádela a `TOOLS` en `FoMT_Suite.html`.
 
@@ -25,12 +25,20 @@ Cada herramienta también funciona sola. Se comunican con la suite por `postMess
 | Tabla de mapas | `0x105EDC` | 66 entradas de 40 bytes; única referencia en el literal `0x0A46A8` (`GetMapData`), por eso se puede reubicar para añadir mapas. |
 | Tabla de parches (edificios y muebles) | `0x10692C` | 82 entradas de 24 bytes (ancho, alto, 3 capas u16 sin comprimir, tipos y rejilla de colisión). El mapa de cada parche sale de la tabla de saltos por mapa en `0x080A685C`. |
 | Colisión → scripts | — | Campo «evento» = nº de script (salidas); campo «objeto» ÷ 2 = nº de script (puertas). El destino es el `Warp_Player(escena, x, y)` de ese script. |
-| Tabla de canciones m4a | `0x13ABF0` | 211 entradas (`gSongTable` en la decomp de StanHash). Reproductor 0 = música; el resto, efectos. |
+| Tabla de canciones m4a | `0x13ABF0` | 211 entradas de 8 bytes {canción, reproductor, reproductor} (`gSongTable` en la decomp de StanHash). Reproductor 0 = música, 3 = efectos; hay 5 reproductores de 8 pistas (`gMusicPlayerTable`, `0x13ABB4`). La apuntan 11 literales: `0x8B84`, `0x8BAC`, `0x8BCC`, `0x8D58`, `0x8D6C`, `0x8D80` (`asm/hardware.s`) y `0xD2300`, `0xD2334`, `0xD2380`, `0xD23D4`, `0xD2408` (`m4aSongNum*` en `src/m4a.c`). Al añadir canciones se copia ampliada al espacio libre y se repuntan los 11; el audio la relee desde `0xD2300`. |
+
+### Importar MIDI (audio, GBA)
+**Importar MIDI a la ROM…** (columna derecha de `audio.html`, con una ROM de GBA abierta):
+- **MIDI → m4a/MP2K**: una pista por canal MIDI (máx. 8, lo que admite cada reproductor), 24 ticks por negra. Convierte tempo, programa, volumen (CC7 × CC11), panorama, pitch bend y su rango (RPN 0), modulación, notas `N1`–`N96` (+ gate) y `TIE`/`EOT` para las más largas. Puedes cambiar el programa de cada canal; el canal 10 va a la batería del voicegroup.
+- **Bucle**: marcadores `[` y `]` (o `loopStart`/`loopEnd`, o CC111), la canción entera o sin bucle (efectos). Termina con `GOTO` al punto de bucle y vuelve a emitir el estado allí.
+- **Voicegroup**: uno de la ROM o uno nuevo (copia del elegido) con muestras **WAV** en los programas que elijas, guardadas como WaveData de 8 bits (cabecera de 16 bytes, frecuencia ajustada a la nota raíz, bucle y nota raíz del chunk `smpl` si lo tiene).
+- **Destino**: reemplazar una canción o efecto (solo cambia su entrada de `gSongTable`) o añadir uno nuevo (copia `gSongTable` ampliada y repunta sus 11 referencias). Todo se escribe tras el último byte que no es `0x00`/`0xFF`, la cabecera va al final (acaba en un puntero) y, si no cabe, la ROM se amplía a 16 o 32 MB.
+- Al terminar relee la ROM generada, reproduce la canción y la envía a la suite con `FomtHub.publish`; también se puede descargar.
 
 ### Pendiente
 - Editar el destino de un warp (requiere recompilar el script) y que una escena cargue un mapa nuevo.
 - NPC: añadir NPC y retratos nuevos, visor de sprites con las 4 poses animadas y sprites nuevos; capa de NPC y rutas en el editor de mapas.
-- Audio: añadir canciones y efectos nuevos (MIDI → m4a; `FOMT_Studio` ya tiene un compilador MIDI → Sappy en Python).
+- Audio: que el juego llame a las canciones nuevas (#211 en adelante) desde sus scripts; hoy suenan en el juego las que reemplazan a una existente.
 
 ---
 

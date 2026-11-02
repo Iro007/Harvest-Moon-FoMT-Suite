@@ -62,6 +62,21 @@ h2{font-size:12px;font-weight:600;color:var(--mute);margin:0;padding:10px 12px;b
 .mini.on.s{background:var(--acc2);color:#1c1403;border-color:var(--acc2)}
 .trk input[type=range]{grid-column:2 / 5;accent-color:var(--acc);height:14px}
 .note{padding:10px 12px;color:var(--mute);font-size:12px}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog form{display:flex;flex-direction:column;max-height:calc(100vh - 34px)}
+dialog .dh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+dialog .dh h3{margin:0;font-size:15px;flex:1}
+dialog .db{overflow:auto;padding:4px 0}
+dialog .df{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--line)}
+dialog .field select,dialog .field input[type=number],dialog .field input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+dialog table{width:100%;border-collapse:collapse;font-size:12px}
+dialog th{text-align:left;color:var(--mute);font-weight:500;padding:4px 6px}
+dialog td{padding:3px 6px;border-top:1px solid var(--line)}
+dialog td input[type=number]{width:64px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:3px 5px}
+dialog .k{color:var(--mute);font-family:var(--mono);font-size:11px}
+#imp-msg{white-space:pre-wrap}
+#imp-msg.bad{color:var(--bad)}
 @media(max-width:1000px){main{grid-template-columns:220px 1fr}.col.r{display:none}}
 </style>
 </head>
@@ -104,9 +119,38 @@ h2{font-size:12px;font-weight:600;color:var(--mute);margin:0;padding:10px 12px;b
     <div id="tracks"><div class="note">Selecciona una canción para ver sus pistas (silenciar / solo / volumen).</div></div>
     <h2>Exportar</h2>
     <div class="field"><div class="row"><button class="btn" id="xwav" disabled>WAV</button><button class="btn" id="xmid" disabled>MIDI</button><button class="btn" id="xraw" disabled>SSEQ</button></div></div>
+    <h2>Importar (GBA)</h2>
+    <div class="field"><button class="btn" id="bimp" disabled style="width:100%">Importar MIDI a la ROM…</button></div>
     <div class="note">Se re-renderiza al cambiar velocidad, transposición, mute o solo. La envolvente, el vibrato y las notas PSG son aproximaciones del hardware real; el MIDI conserva notas, programas y tempo.</div>
   </section>
 </main>
+<dialog id="imp">
+  <form method="dialog">
+    <div class="dh"><h3>Importar MIDI a la ROM (m4a)</h3><button class="btn" value="cancel" aria-label="Cerrar">✕</button></div>
+    <div class="db">
+      <div class="field"><label for="imp-mid">Archivo MIDI (.mid)</label><input id="imp-mid" type="file" accept=".mid,.midi"><div class="note" id="imp-info" style="padding:6px 0 0">—</div></div>
+      <div class="field"><div class="row">
+        <div><label for="imp-target">Destino</label><select id="imp-target"></select></div>
+        <div><label for="imp-player">Reproductor</label><select id="imp-player"></select></div>
+      </div></div>
+      <div class="field"><div class="row">
+        <div><label for="imp-vg">Voicegroup (instrumentos)</label><select id="imp-vg"></select></div>
+        <div><label for="imp-loop">Bucle</label><select id="imp-loop"><option value="auto">Marcadores del MIDI ([ ] / loopStart)</option><option value="all">Toda la canción</option><option value="none">Sin bucle (efecto)</option></select></div>
+      </div></div>
+      <h2>Canales → pistas m4a</h2>
+      <div class="field" id="imp-chans"><div class="note" style="padding:0">Elige un MIDI.</div></div>
+      <h2>Muestras WAV (voicegroup nuevo)</h2>
+      <div class="field">
+        <div class="row"><div><label for="imp-wav">Añadir WAV (8/16/24 bits o float, mono o estéreo)</label><input id="imp-wav" type="file" accept=".wav,audio/wav" multiple></div>
+        <div><label for="imp-rate">Frecuencia en la ROM</label><select id="imp-rate"><option value="0">Original (máx. 22050)</option><option value="22050">22050 Hz</option><option value="13379">13379 Hz</option><option value="10512">10512 Hz</option><option value="8000">8000 Hz</option></select></div></div>
+        <div id="imp-waves" style="margin-top:8px"></div>
+        <div class="note" style="padding:6px 0 0">Si hay muestras se crea un voicegroup nuevo, copia del elegido, con cada WAV en su programa (DirectSound 8 bits, ADSR 255/0/255/165). Sin muestras se usa el voicegroup tal cual.</div>
+      </div>
+      <div class="field"><div id="imp-msg" class="note" style="padding:0"></div></div>
+    </div>
+    <div class="df"><button class="btn" id="imp-dl" type="button" disabled>Descargar ROM</button><button class="btn primary" id="imp-go" type="button" disabled>Inyectar en la ROM</button></div>
+  </form>
+</dialog>
 
 <script>
 /* ===== Motor SDAT (Nitro Sound) ===== */
@@ -432,8 +476,11 @@ const GBA = (() => {
 const u16 = (b,o) => b[o] | b[o+1] << 8;
 const u32 = (b,o) => (b[o] | b[o+1] << 8 | b[o+2] << 16 | b[o+3] << 24) >>> 0;
 const ptr = (b,p) => { if (p < 0x08000000 || p >= 0x0A000000) return -1; const o = p & 0x1FFFFFF; return o < b.length ? o : -1; };
-// Tablas de tablas conocidas: [offset, entradas]. FoMT USA: gSongTable 0x13ABF0..0x13B288 (decomp StanHash).
-const KNOWN = { "A4NE": [0x13ABF0, 211] };
+// Juegos conocidos. FoMT USA: gSongTable 0x13ABF0..0x13B288 (211 entradas) y los 11 literales que la apuntan
+// (decomp StanHash: 6 en asm/hardware.s y 5 en src/m4a.c, m4aSongNum*). La tabla se relee desde el literal de
+// m4aSongNumStart (0xD2300), así sigue funcionando después de reubicarla.
+const KNOWN = { "A4NE": { table:0x13ABF0, count:211, players:5, maxTracks:8,
+  refs:[0x8B84, 0x8BAC, 0x8BCC, 0x8D58, 0x8D6C, 0x8D80, 0xD2300, 0xD2334, 0xD2380, 0xD23D4, 0xD2408] } };
 const LEN = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,28,30,32,36,40,42,44,48,52,54,56,60,64,66,68,72,76,78,80,84,88,90,92,96];
 
 function isGba(b){ return b.length >= 0xC0 && b[0xB2] === 0x96; }
@@ -455,8 +502,15 @@ function findTable(b){
   }
   return best;
 }
+function tableOf(b){
+  const k = KNOWN[gameCode(b)]; if (!k) return findTable(b);
+  const p = ptr(b, u32(b, k.refs[6])), o = p >= 0 ? p : k.table;
+  let n = 0; while (n < 4096 && o + n * 8 + 8 <= b.length && ptr(b, u32(b, o + n * 8)) >= 0) n++;
+  return [o, n];
+}
 function parse(b){
-  const code = gameCode(b), t = KNOWN[code] || findTable(b);
+  sampleCache.clear();
+  const code = gameCode(b), t = tableOf(b);
   if (!t) throw new Error("No se encontró la tabla de canciones m4a en esta ROM.");
   const songs = [];
   for (let i = 0; i < t[1]; i++){
@@ -649,7 +703,240 @@ async function render(b, song, sim, R){
   return { L:L.subarray(0, n), R:Rr.subarray(0, n), SR };
 }
 
-return { isGba, parse, simulate, render, samples, voice };
+return { isGba, parse, simulate, render, samples, voice, KNOWN, LEN, gameCode, ptr, u32 };
+})();
+</script>
+<script>
+/* ===== Importar MIDI → m4a / MP2K y escribirlo en la ROM de GBA =====
+   MIDI (SMF 0/1) → una pista m4a por canal MIDI (24 ticks por negra), con TEMPO, VOICE, VOL (CC7×CC11), PAN,
+   BEND, BENDR (RPN 0), MOD, notas N1..N96 (+ gate) y TIE/EOT para las largas. Bucle con marcadores «[»/«]»
+   (o loopStart/loopEnd, o CC111) o la canción entera: GOTO al punto de bucle reemitiendo el estado.
+   Las muestras WAV se guardan como WaveData de 8 bits (cabecera de 16 bytes) en un voicegroup nuevo,
+   copia del elegido. Todo va al espacio libre (detrás del último byte que no es 0x00/0xFF); si se añaden
+   canciones, gSongTable se copia ampliada al espacio libre y se repuntan sus referencias en el código. */
+const M4AW = (() => {
+const { LEN, KNOWN, gameCode, ptr, u32 } = GBA;
+const be16 = (b,o) => b[o] << 8 | b[o+1], be32 = (b,o) => (b[o] << 24 | b[o+1] << 16 | b[o+2] << 8 | b[o+3]) >>> 0;
+const str = (b,o,n) => { let s = ""; for (let i = 0; i < n && o + i < b.length; i++) s += String.fromCharCode(b[o+i]); return s; };
+
+/* ---------- SMF ---------- */
+function parseMidi(b){
+  if (str(b,0,4) !== "MThd") throw new Error("No es un archivo MIDI (falta MThd).");
+  const hl = be32(b,4), fmt = be16(b,8), nt = be16(b,10), div = be16(b,12);
+  if (div & 0x8000) throw new Error("MIDI con división SMPTE: no soportado (usa ticks por negra).");
+  const tracks = []; let p = 8 + hl;
+  while (tracks.length < nt && p + 8 <= b.length){
+    const len = be32(b, p + 4), end = Math.min(b.length, p + 8 + len);
+    if (str(b,p,4) === "MTrk"){
+      const ev = []; let q = p + 8, tick = 0, rs = 0;
+      const vlq = () => { let v = 0, c; do { c = b[q++]; v = v * 128 + (c & 0x7f); } while ((c & 0x80) && q < end); return v; };
+      while (q < end){
+        tick += vlq(); let st = b[q];
+        if (st >= 0x80){ q++; if (st < 0xF0) rs = st; } else if (rs) st = rs; else break;
+        if (st === 0xFF){ const ty = b[q++], l = vlq(); ev.push({ tick, meta:ty, data:b.subarray(q, q + l) }); q += l; if (ty === 0x2F) break; }
+        else if (st === 0xF0 || st === 0xF7){ q += vlq(); }
+        else { const hi = st & 0xF0, a = b[q++], d = (hi === 0xC0 || hi === 0xD0) ? 0 : b[q++]; ev.push({ tick, type:hi, ch:st & 15, a, b:d }); }
+      }
+      tracks.push(ev);
+    }
+    p = p + 8 + len;
+  }
+  return { fmt, ppq:div, tracks };
+}
+
+/* Agrupa por canal: notas {t, dur, key, vel} y controles {t, k, v} ya en ticks m4a. */
+function analyze(midi){
+  const all = []; midi.tracks.forEach(ev => ev.forEach(e => all.push(e)));
+  all.sort((a, c) => a.tick - c.tick);
+  const T = t => Math.round(t * 24 / midi.ppq), tempos = [], chans = new Map();
+  let loopS = null, loopE = null, end = 0;
+  const C = ch => { if (!chans.has(ch)) chans.set(ch, { ch, notes:[], ev:[], open:{}, cc7:100, cc11:127, rpn:[127,127], progs:new Set() }); return chans.get(ch); };
+  for (const e of all){
+    const t = T(e.tick);
+    if (e.meta !== undefined){
+      if (e.meta === 0x51 && e.data.length >= 3) tempos.push({ t, bpm:60000000 / (e.data[0] << 16 | e.data[1] << 8 | e.data[2]) });
+      else if (e.meta === 6 || e.meta === 1){
+        const s = str(e.data, 0, e.data.length).trim().toLowerCase().replace(/[\s_]/g, "");
+        if (s === "[" || s === "loopstart") loopS = t; else if (s === "]" || s === "loopend") loopE = t;
+      }
+      continue;
+    }
+    const c = C(e.ch);
+    if (e.type === 0x90 && e.b > 0) (c.open[e.a] || (c.open[e.a] = [])).push({ t, key:e.a, vel:e.b });
+    else if (e.type === 0x80 || e.type === 0x90){ const q = c.open[e.a]; if (q && q.length){ const n = q.shift(); n.dur = Math.max(1, t - n.t); c.notes.push(n); end = Math.max(end, n.t + n.dur); } }
+    else if (e.type === 0xC0){ c.ev.push({ t, k:"prog", v:e.a }); c.progs.add(e.a); }
+    else if (e.type === 0xE0) c.ev.push({ t, k:"bend", v:(e.b << 7 | e.a) >> 7 });
+    else if (e.type === 0xB0){
+      if (e.a === 7 || e.a === 11){ if (e.a === 7) c.cc7 = e.b; else c.cc11 = e.b; c.ev.push({ t, k:"vol", v:Math.round(c.cc7 * c.cc11 / 127) }); }
+      else if (e.a === 10) c.ev.push({ t, k:"pan", v:e.b });
+      else if (e.a === 1) c.ev.push({ t, k:"mod", v:e.b });
+      else if (e.a === 101) c.rpn[0] = e.b; else if (e.a === 100) c.rpn[1] = e.b;
+      else if (e.a === 6 && c.rpn[0] === 0 && c.rpn[1] === 0) c.ev.push({ t, k:"bendr", v:e.b });
+      else if (e.a === 111 && loopS === null) loopS = t;              // CC111 (convención RPG Maker)
+    }
+  }
+  for (const c of chans.values()) for (const k in c.open) for (const n of c.open[k]){ n.dur = Math.max(1, end - n.t); c.notes.push(n); }
+  const list = [...chans.values()].filter(c => c.notes.length).sort((a, c) => a.ch - c.ch);
+  list.forEach(c => c.notes.sort((a, d) => a.t - d.t || a.key - d.key));
+  return { ppq:midi.ppq, tempos, loopS, loopE, end, chans:list };
+}
+
+/* ---------- compilador ---------- */
+function waits(out, n){ while (n > 0){ let i = 48; while (LEN[i] > n) i--; out.push(0x80 + i); n -= LEN[i]; } }
+function compile(info, o){
+  o = Object.assign({ loop:"auto", progs:{}, maxTracks:8 }, o || {});
+  const warn = [];
+  let chans = info.chans;
+  if (!chans.length) throw new Error("El MIDI no tiene notas.");
+  if (chans.length > o.maxTracks){ warn.push("El MIDI usa " + chans.length + " canales; el reproductor admite " + o.maxTracks + ": se descartan los canales " + chans.slice(o.maxTracks).map(c => c.ch + 1).join(", ") + "."); chans = chans.slice(0, o.maxTracks); }
+  let songEnd = Math.max(1, Math.ceil(info.end / 24) * 24), loopS = null, loopE = null;
+  if (o.loop === "all"){ loopS = 0; loopE = songEnd; }
+  else if (o.loop === "auto" && info.loopS !== null){ loopS = info.loopS; loopE = info.loopE !== null && info.loopE > loopS ? info.loopE : songEnd; }
+  if (loopS !== null && loopE <= loopS){ loopS = loopE = null; }
+  const end = loopS !== null ? loopE : songEnd;
+  const bpm0 = (info.tempos.find(x => x.t === 0) || { bpm:120 }).bpm, tb = v => Math.max(1, Math.min(255, Math.round(v / 2)));
+  const tracks = chans.map((c, ti) => {
+    const fixed = o.progs[c.ch], out = [], ties = {}, ord = { loop:0, eot:1, tempo:2, prog:3, vol:3, pan:3, bend:3, bendr:3, mod:3, note:4 };
+    const st = { prog:fixed != null ? fixed : 0, vol:100, pan:64, bend:64, bendr:2, mod:0, tempo:bpm0 };
+    let ev = c.ev.filter(e => !(e.k === "prog" && fixed != null)).map(e => Object.assign({}, e));
+    if (ti === 0) ev = ev.concat(info.tempos.map(x => ({ t:x.t, k:"tempo", v:x.bpm })));
+    for (const e of ev) if (e.t === 0) st[e.k] = e.v;
+    ev = ev.filter(e => e.t > 0);
+    for (const n of c.notes){ ev.push({ t:n.t, k:"note", n }); if (n.dur > 96) ev.push({ t:n.t + n.dur, k:"eot", v:n.key }); }
+    if (loopS !== null) ev.push({ t:loopS, k:"loop" });
+    ev = ev.filter(e => e.t < end || (e.k === "eot" && e.t === end));
+    ev.sort((a, d) => a.t - d.t || ord[a.k] - ord[d.k]);
+    const state = () => { if (ti === 0) out.push(0xBB, tb(st.tempo)); out.push(0xBD, st.prog & 127, 0xBE, st.vol & 127, 0xBF, st.pan & 127, 0xC1, st.bendr & 127, 0xC0, st.bend & 127); if (st.mod) out.push(0xC4, st.mod & 127); };
+    if (loopS !== 0) state();
+    let cur = 0, loopOff = -1;
+    for (const e of ev){
+      if (e.t > cur){ waits(out, e.t - cur); cur = e.t; }
+      switch (e.k){
+        case "loop": loopOff = out.length; state(); break;
+        case "tempo": st.tempo = e.v; out.push(0xBB, tb(e.v)); break;
+        case "prog": st.prog = e.v; out.push(0xBD, e.v & 127); break;
+        case "vol": st.vol = e.v; out.push(0xBE, e.v & 127); break;
+        case "pan": st.pan = e.v; out.push(0xBF, e.v & 127); break;
+        case "bend": st.bend = e.v; out.push(0xC0, e.v & 127); break;
+        case "bendr": st.bendr = e.v; out.push(0xC1, e.v & 127); break;
+        case "mod": st.mod = e.v; out.push(0xC4, e.v & 127); break;
+        case "eot": if (ties[e.v]){ out.push(0xCE, e.v); delete ties[e.v]; } break;
+        case "note": { const n = e.n, vel = Math.max(1, Math.min(127, n.vel));
+          if (n.dur > 96){ if (ties[n.key]){ out.push(0xCE, n.key); } ties[n.key] = true; out.push(0xCF, n.key, vel); }
+          else { let i = 48; while (LEN[i] > n.dur) i--; out.push(0xCF + i, n.key, vel); if (n.dur > LEN[i]) out.push(n.dur - LEN[i]); }
+          break; }
+      }
+    }
+    if (end > cur) waits(out, end - cur);
+    for (const k in ties) out.push(0xCE, +k);
+    let gotoAt = -1;
+    if (loopOff >= 0){ out.push(0xB2); gotoAt = out.length; out.push(0, 0, 0, 0); }
+    out.push(0xB1);
+    return { ch:c.ch, bytes:Uint8Array.from(out), gotoAt, loopOff, notes:c.notes.length };
+  });
+  return { tracks, warn, loopS, loopE, end, bpm:bpm0 };
+}
+
+/* ---------- WAV → WaveData (PCM 8 bits) ---------- */
+// fmt (frecuencia original) y smpl (bucle, nota raíz) se leen a mano; el audio lo decodifica y re-muestrea el navegador.
+function wavInfo(b){
+  const r = { rate:0, root:null, loop:null };
+  if (str(b,0,4) !== "RIFF" || str(b,8,4) !== "WAVE") return r;
+  for (let p = 12; p + 8 <= b.length; ){
+    const id = str(b,p,4), len = u32(b, p + 4), d = p + 8;
+    if (id === "fmt ") r.rate = u32(b, d + 4);
+    if (id === "smpl" && len >= 36){ r.root = u32(b, d + 12) & 127; if (u32(b, d + 28) > 0 && len >= 60) r.loop = [u32(b, d + 36 + 8), u32(b, d + 36 + 12) + 1]; }
+    p = d + len + (len & 1);
+  }
+  return r;
+}
+async function decodeWav(bytes, targetRate){
+  const inf = wavInfo(bytes), srcRate = inf.rate || 22050;
+  const rate = Math.round(Math.max(3000, Math.min(96000, targetRate || Math.min(22050, srcRate))));
+  const oac = new OfflineAudioContext(1, 1, rate);
+  const ab = await oac.decodeAudioData(bytes.slice().buffer);
+  const n = ab.length, mix = new Float32Array(n);
+  for (let c = 0; c < ab.numberOfChannels; c++){ const d = ab.getChannelData(c); for (let i = 0; i < n; i++) mix[i] += d[i] / ab.numberOfChannels; }
+  let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(mix[i]));
+  const k = peak > 1 ? 1 / peak : 1, pcm = new Int8Array(n);
+  for (let i = 0; i < n; i++) pcm[i] = Math.max(-128, Math.min(127, Math.round(mix[i] * k * 127)));
+  const sc = rate / srcRate;
+  const loop = inf.loop ? [Math.min(n - 1, Math.round(inf.loop[0] * sc)), Math.min(n, Math.round(inf.loop[1] * sc))] : null;
+  return { pcm:loop ? pcm.subarray(0, Math.max(loop[0] + 1, loop[1])) : pcm, rate, root:inf.root == null ? 60 : inf.root, loopStart:loop ? loop[0] : 0, smplLoop:!!loop };
+}
+// Cabecera WaveData: u16 tipo, u16 estado (0x4000 = bucle), u32 frecuencia·1024 (ajustada a la nota raíz),
+// u32 inicio del bucle, u32 nº de muestras; después las muestras con signo y una más para interpolar.
+function waveData(w){
+  const n = w.pcm.length, out = new Uint8Array(16 + n + 1), v = new DataView(out.buffer);
+  v.setUint16(2, w.loop ? 0x4000 : 0, true);
+  v.setUint32(4, Math.round(w.rate * 1024 * Math.pow(2, (60 - w.root) / 12)), true);
+  v.setUint32(8, w.loop ? w.loopStart : 0, true); v.setUint32(12, n, true);
+  for (let i = 0; i < n; i++) out[16 + i] = w.pcm[i] & 255;
+  out[16 + n] = w.loop ? w.pcm[w.loopStart] & 255 : 0;
+  return out;
+}
+
+/* ---------- escritura en la ROM ---------- */
+const lastData = b => { let e = b.length; while (e > 0 && (b[e-1] === 0 || b[e-1] === 0xFF)) e--; return e; };
+// Literales que apuntan a la tabla: los conocidos (verificados) o, en otros juegos, todo u32 alineado igual al puntero.
+function tableRefs(b, table){
+  const want = (0x08000000 | table) >>> 0, k = KNOWN[gameCode(b)], refs = [];
+  if (k){ for (const r of k.refs) if (u32(b, r) === want) refs.push(r); return refs; }
+  for (let o = 0; o + 4 <= b.length; o += 4) if (u32(b, o) === want && (o < table || o >= table + 8)) refs.push(o);
+  return refs;
+}
+function inject(rom, comp, o){
+  // o: { target:"new"|id, player, vg (offset), prio, reverb, waves:[{pcm,rate,root,loop,loopStart,prog,adsr}], tableCount }
+  const gb = GBA.parse(rom), k = KNOWN[gb.code];
+  const nt = comp.tracks.length, adding = o.target === "new";
+  const blobs = [];                                  // [{bytes, align}] en orden de escritura
+  const waves = (o.waves || []).map(w => ({ w, data:waveData(w) }));
+  let size = 0; const al = n => (n + 3) & ~3;
+  waves.forEach(x => size += al(x.data.length));
+  if (waves.length) size += 128 * 12;
+  comp.tracks.forEach(t => size += al(t.bytes.length));
+  if (adding) size += (gb.count + 1) * 8 + 8;
+  size += 8 + nt * 4;
+  let b = rom, base = (lastData(rom) + 31) & ~15;
+  if (base + size > b.length){
+    let L = b.length; while (base + size > L) L *= 2;
+    if (L > 0x2000000) throw new Error("No cabe: harían falta " + size + " bytes y la ROM no puede pasar de 32 MB.");
+    const nb = new Uint8Array(L).fill(0xFF); nb.set(b); b = nb;
+  } else b = b.slice();
+  let cur = base;
+  const put = bytes => { const at = cur; b.set(bytes, at); cur = al(at + bytes.length); return at; };
+  const p32 = (at, off) => { const v = (0x08000000 | off) >>> 0; b[at] = v & 255; b[at+1] = v >>> 8 & 255; b[at+2] = v >>> 16 & 255; b[at+3] = v >>> 24; };
+  // 1. muestras y voicegroup
+  let vg = o.vg;
+  if (waves.length){
+    const offs = waves.map(x => put(x.data));
+    const tbl = new Uint8Array(128 * 12);
+    tbl.set(rom.subarray(o.vg, Math.min(rom.length, o.vg + 128 * 12)));
+    waves.forEach((x, i) => { const e = x.w.prog * 12, a = x.w.adsr || [255, 0, 255, 165];
+      tbl.set([0x00, 60, 0, 0, 0, 0, 0, 0, a[0], a[1], a[2], a[3]], e); });
+    vg = put(tbl);
+    waves.forEach((x, i) => p32(vg + x.w.prog * 12 + 4, offs[i]));
+  }
+  // 2. pistas (con el GOTO del bucle resuelto)
+  const tOff = comp.tracks.map(t => { const at = put(t.bytes); if (t.gotoAt >= 0) p32(at + t.gotoAt, at + t.loopOff); return at; });
+  // 3. tabla ampliada (al añadir) y repunteo de sus referencias
+  let id, table = gb.table, refs = [];
+  if (adding){
+    refs = tableRefs(b, gb.table);
+    if (!refs.length || (k && refs.length !== k.refs.length)) throw new Error("No se encontraron todas las referencias a gSongTable (" + refs.length + (k ? "/" + k.refs.length : "") + "): la ROM está modificada de otra forma.");
+    const old = b.slice(gb.table, gb.table + gb.count * 8), nt8 = new Uint8Array((gb.count + 1) * 8 + 8);
+    nt8.set(old); table = put(nt8); id = gb.count;
+    for (const r of refs) p32(r, table);
+  } else id = o.target;
+  // 4. cabecera de la canción (lo último: acaba en un puntero, nunca en 0x00/0xFF)
+  const hdr = new Uint8Array(8 + nt * 4); hdr[0] = nt; hdr[1] = 0; hdr[2] = o.prio & 255; hdr[3] = o.reverb & 255;
+  const hAt = put(hdr); p32(hAt + 4, vg); tOff.forEach((t, i) => p32(hAt + 8 + i * 4, t));
+  // 5. entrada de la tabla: {canción, reproductor, reproductor}
+  const e = table + id * 8; p32(e, hAt); b[e+4] = o.player & 255; b[e+5] = 0; b[e+6] = o.player & 255; b[e+7] = 0;
+  return { rom:b, id, header:hAt, vg, table, refs, base, end:cur, size:cur - base, expanded:b.length !== rom.length };
+}
+
+return { parseMidi, analyze, compile, decodeWav, waveData, inject, lastData, tableRefs };
 })();
 </script>
 <script src="fomt-hub.js"></script>
@@ -879,7 +1166,7 @@ $("rom-in").addEventListener("change", async ev => {
     let b = new Uint8Array(await f.arrayBuffer());
     if (GBA.isGba(b)){ loadGba(b, f.name); return; }
     if (/\.zip$/i.test(f.name) || u32(b,0) === 0x04034b50) b = await unzipFirstNds(b.buffer);
-    gb = null; gbSamples = null; rom = b; const files = parseNitroFS(rom), s = files.find(x => /\.sdat$/i.test(x.name));
+    gb = null; gbSamples = null; rom = b; $("bimp").disabled = true; const files = parseNitroFS(rom), s = files.find(x => /\.sdat$/i.test(x.name));
     if (!s) throw new Error("No se encontró ningún .sdat en la ROM.");
     sd = AE.parseSdat(rom.subarray(s.start, s.end)); buildList();
     setStatus("ROM cargada · <b>" + sd.seqs.length + "</b> secuencias · " + sd.banks.length + " bancos · " + sd.wavearcs.length + " archivos de ondas · " + sd.strms.length + " stream");
@@ -887,9 +1174,9 @@ $("rom-in").addEventListener("change", async ev => {
 });
 /* ---------- GBA (m4a) ---------- */
 function loadGba(b, name){
-  stopPlayback(true); cur = null; sd = null; rom = b;
-  try { gb = GBA.parse(b); } catch (e){ gb = null; setStatus("<span style='color:var(--bad)'>" + e.message + "</span>"); buildList(); return; }
-  gbSamples = null; buildList();
+  stopPlayback(true); cur = null; sd = null; rom = b; romName = name || romName;
+  try { gb = GBA.parse(b); } catch (e){ gb = null; $("bimp").disabled = true; setStatus("<span style='color:var(--bad)'>" + e.message + "</span>"); buildList(); return; }
+  gbSamples = null; buildList(); $("bimp").disabled = false;
   const bgm = gb.songs.filter(s => s.player === 0).length;
   setStatus("ROM GBA <b>" + gb.code + "</b> cargada · tabla m4a en 0x" + gb.table.toString(16).toUpperCase() + " · <b>" + bgm + "</b> canciones · " + (gb.songs.length - bgm) + " efectos");
 }
@@ -925,6 +1212,141 @@ function pickGbaWave(it){
   setStatus(it.label + " · " + Math.round(w.rate) + " Hz · PCM 8 bits" + (w.loop ? " · bucle desde " + w.loopStart : ""));
   ["bplay","bstop","seek","xwav"].forEach(x => $(x).disabled = false); buildList(); play(0);
 }
+/* ---------- importar MIDI (GBA) ---------- */
+let romName = "rom.gba";
+const imp = { info:null, midiName:"", waves:[] };
+const hx = n => "0x" + n.toString(16).toUpperCase();
+const NOTE = k => ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][k % 12] + (Math.floor(k / 12) - 1);
+function vgKind(vg, p){
+  const o = vg + p * 12; if (vg < 0 || o + 12 > rom.length) return "—";
+  const t = rom[o]; if (t === 0x40) return "multi"; if (t === 0x80) return "batería";
+  const k = t & 7; if (k === 0) return GBA.ptr(rom, u32(rom, o + 4)) >= 0 ? (t & 8 ? "PCM fija" : "PCM") : "—";
+  return ["", "cuadrada", "cuadrada", "onda", "ruido"][k] || "—";
+}
+const impVg = () => +$("imp-vg").value;
+const commonOf = (arr, f) => { const m = new Map(); arr.forEach(x => { const k = f(x); m.set(k, (m.get(k) || 0) + 1); }); return [...m].sort((a, c) => c[1] - a[1])[0]?.[0]; };
+function openImport(){
+  if (!gb) return;
+  const k = GBA.KNOWN[gb.code], np = k ? k.players : 4;
+  $("imp-target").innerHTML = '<option value="new">Añadir: canción nueva #' + gb.count + '</option>' +
+    gb.songs.map(s => '<option value="' + s.id + '">Reemplazar ' + (s.player === 0 ? "canción " : "efecto ") + s.id + ' (' + s.tracks + ' pistas)</option>').join("");
+  $("imp-player").innerHTML = Array.from({ length:np }, (_, i) => '<option value="' + i + '">' + i + (i === 0 ? " · música" : i === 3 ? " · efectos" : "") + '</option>').join("");
+  const vgs = new Map(); gb.songs.forEach(s => { if (s.vg >= 0){ if (!vgs.has(s.vg)) vgs.set(s.vg, []); vgs.get(s.vg).push(s.id); } });
+  $("imp-vg").innerHTML = [...vgs].map(([v, ids]) => '<option value="' + v + '">' + hx(v) + ' · ' + ids.length + ' canc. (#' + ids.slice(0, 4).join(", #") + (ids.length > 4 ? "…" : "") + ')</option>').join("");
+  if (cur && cur.gsong) $("imp-target").value = cur.gsong.id;
+  targetChanged(); $("imp-msg").textContent = ""; $("imp-msg").className = "note"; $("imp-dl").disabled = true;
+  $("imp").showModal();
+}
+function targetChanged(){
+  const t = $("imp-target").value, s = t === "new" ? null : gb.songs.find(x => x.id === +t);
+  const player = s ? s.player : 0; $("imp-player").value = player;
+  $("imp-vg").value = s ? s.vg : commonOf(gb.songs.filter(x => x.player === 0), x => x.vg);
+  if (!s && $("imp-loop").value === "none") $("imp-loop").value = "auto";
+  if (s && s.player !== 0) $("imp-loop").value = "none";
+  drawChans();
+}
+function drumProg(){ const vg = impVg(); for (let p = 0; p < 128; p++) if (vgKind(vg, p) === "batería") return p; return null; }
+function drawChans(){
+  const box = $("imp-chans"); if (!imp.info){ box.innerHTML = '<div class="note" style="padding:0">Elige un MIDI.</div>'; return; }
+  const k = GBA.KNOWN[gb.code], max = k ? k.maxTracks : 16, vg = impVg(), dp = drumProg();
+  box.innerHTML = '<table><thead><tr><th>Canal</th><th>Notas</th><th>Programa MIDI</th><th>Programa m4a</th><th>Instrumento en el voicegroup</th></tr></thead><tbody></tbody></table>';
+  const tb = box.querySelector("tbody");
+  imp.info.chans.forEach((c, i) => {
+    const tr = document.createElement("tr"), midiProg = [...c.progs][0] ?? 0;
+    if (c.prog == null) c.prog = c.ch === 9 && dp != null ? dp : midiProg;
+    tr.innerHTML = '<td>' + (c.ch + 1) + (c.ch === 9 ? " (perc.)" : "") + '</td><td>' + c.notes.length + '</td><td class="k">' + ([...c.progs].join(", ") || "—") + '</td><td><input type="number" min="0" max="127"></td><td class="k"></td>';
+    if (i >= max) tr.style.opacity = .4;
+    const inp = tr.querySelector("input"), kind = tr.lastChild;
+    const show = () => { const w = imp.waves.find(x => x.prog === c.prog); kind.textContent = w ? "WAV: " + w.name : vgKind(vg, c.prog); };
+    inp.value = c.prog; inp.oninput = () => { c.prog = Math.max(0, Math.min(127, +inp.value | 0)); show(); };
+    show(); tb.appendChild(tr);
+  });
+  if (imp.info.chans.length > max){ const n = document.createElement("div"); n.className = "note"; n.style.padding = "6px 0 0"; n.textContent = "Solo entran " + max + " pistas por reproductor: los canales atenuados se descartan."; box.appendChild(n); }
+}
+function drawWaves(){
+  const box = $("imp-waves"); if (!imp.waves.length){ box.textContent = ""; return; }
+  box.innerHTML = '<table><thead><tr><th>Muestra</th><th>Programa</th><th>Nota raíz</th><th>Bucle</th><th>Datos</th><th></th></tr></thead><tbody></tbody></table>';
+  const tb = box.querySelector("tbody");
+  imp.waves.forEach((w, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td></td><td><input type="number" min="0" max="127" class="p"></td><td><input type="number" min="0" max="127" class="r"> <span class="k"></span></td><td><input type="checkbox"></td><td class="k"></td><td><button class="mini" type="button" title="Quitar">✕</button></td>';
+    tr.firstChild.textContent = w.name;
+    const p = tr.querySelector(".p"), r = tr.querySelector(".r"), nn = tr.querySelector("span"), lp = tr.querySelector("input[type=checkbox]");
+    p.value = w.prog; r.value = w.root; nn.textContent = NOTE(w.root); lp.checked = w.loop;
+    p.oninput = () => { w.prog = Math.max(0, Math.min(127, +p.value | 0)); drawChans(); };
+    r.oninput = () => { w.root = Math.max(0, Math.min(127, +r.value | 0)); nn.textContent = NOTE(w.root); };
+    lp.onchange = () => { w.loop = lp.checked; };
+    tr.children[4].textContent = w.d ? w.d.rate + " Hz · " + (w.d.pcm.length / w.d.rate).toFixed(2) + " s · " + ((w.d.pcm.length + 17) / 1024).toFixed(1) + " KB" : "…";
+    tr.querySelector("button").onclick = () => { imp.waves.splice(i, 1); drawWaves(); drawChans(); };
+    tb.appendChild(tr);
+  });
+}
+async function decodeWaves(){
+  const rate = +$("imp-rate").value;
+  for (const w of imp.waves){
+    try { const d = await M4AW.decodeWav(w.bytes, rate); w.d = d; if (w.root == null) w.root = d.root; if (w.loop == null) w.loop = d.smplLoop; }
+    catch (e){ w.d = null; impMsg("No se pudo decodificar " + w.name + ": " + e.message, true); }
+  }
+  drawWaves();
+}
+function impMsg(t, bad){ $("imp-msg").textContent = t; $("imp-msg").className = "note" + (bad ? " bad" : ""); }
+function impReady(){ $("imp-go").disabled = !imp.info; }
+
+$("bimp").onclick = openImport;
+$("imp-target").onchange = targetChanged;
+$("imp-vg").onchange = () => { if (imp.info) imp.info.chans.forEach(c => { if (c.ch === 9){ const d = drumProg(); if (d != null) c.prog = d; } }); drawChans(); };
+$("imp-rate").onchange = decodeWaves;
+$("imp-mid").onchange = async ev => {
+  const f = ev.target.files[0]; imp.info = null; impReady(); if (!f) return;
+  try {
+    const midi = M4AW.parseMidi(new Uint8Array(await f.arrayBuffer())), info = M4AW.analyze(midi);
+    imp.info = info; imp.midiName = f.name;
+    const notes = info.chans.reduce((a, c) => a + c.notes.length, 0), bpm = (info.tempos[0] || { bpm:120 }).bpm;
+    $("imp-info").textContent = "Formato " + midi.fmt + " · " + midi.ppq + " ticks/negra · " + info.chans.length + " canales con notas · " + notes + " notas · " + Math.round(bpm) + " BPM · " +
+      (info.loopS !== null ? "bucle marcado en el tick m4a " + info.loopS + (info.loopE !== null ? "–" + info.loopE : "") : "sin marcadores de bucle");
+    drawChans(); impMsg("");
+  } catch (e){ $("imp-info").textContent = "—"; impMsg(e.message, true); }
+  impReady();
+};
+$("imp-wav").onchange = async ev => {
+  const used = new Set(imp.waves.map(w => w.prog));
+  for (const f of ev.target.files){
+    let prog = 0; if (imp.info) for (const c of imp.info.chans) if (c.ch !== 9 && !used.has(c.prog)){ prog = c.prog; break; }
+    while (used.has(prog) && prog < 127) prog++; used.add(prog);
+    imp.waves.push({ name:f.name, bytes:new Uint8Array(await f.arrayBuffer()), prog, root:null, loop:null, d:null });
+  }
+  ev.target.value = ""; drawWaves(); await decodeWaves(); drawChans();
+};
+$("imp-go").onclick = async () => {
+  if (!imp.info || !gb) return;
+  try {
+    const k = GBA.KNOWN[gb.code], target = $("imp-target").value, player = +$("imp-player").value;
+    const old = target === "new" ? null : gb.songs.find(s => s.id === +target);
+    const same = gb.songs.filter(s => s.player === player);
+    const progs = {}; imp.info.chans.forEach(c => progs[c.ch] = c.prog);
+    const comp = M4AW.compile(imp.info, { loop:$("imp-loop").value, progs, maxTracks:k ? k.maxTracks : 16 });
+    const waves = imp.waves.filter(w => w.d).map(w => ({ pcm:w.d.pcm, rate:w.d.rate, root:w.root, loop:w.loop, loopStart:w.loop ? w.d.loopStart : 0, prog:w.prog }));
+    const r = M4AW.inject(rom, comp, { target:target === "new" ? "new" : +target, player, vg:impVg(), waves,
+      prio:old ? old.prio : (commonOf(same, s => s.prio) || 0), reverb:old ? old.reverb : (commonOf(same, s => s.reverb) || 0) });
+    // Relee la ROM generada con el reproductor GBA y comprueba que la canción está donde debe.
+    const g2 = GBA.parse(r.rom), song = g2.songs.find(s => s.id === r.id);
+    if (!song || song.hdr !== r.header) throw new Error("La canción inyectada no aparece al releer la ROM.");
+    const notes = comp.tracks.reduce((a, t) => a + t.notes, 0);
+    loadGba(r.rom, romName); FomtHub.publish(r.rom, romName);
+    tab = player === 0 ? "bgm" : "se"; document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === tab));
+    const it = gbItems().find(x => x.gsong.id === r.id); if (it) pick(it);
+    $("imp-dl").disabled = false;
+    impMsg((target === "new" ? "Añadida como canción #" + r.id : "Reemplazada la entrada #" + r.id) + " · " + comp.tracks.length + " pistas · " + notes + " notas · " + Math.round(comp.bpm) + " BPM" +
+      (comp.loopS !== null ? " · bucle " + comp.loopS + "–" + comp.loopE : "") +
+      "\nEscrito en " + hx(r.base) + "–" + hx(r.end) + " (" + r.size + " bytes) · cabecera " + hx(r.header) + " · voicegroup " + hx(r.vg) + (waves.length ? " (nuevo, " + waves.length + " muestras)" : "") +
+      (target === "new" ? "\ngSongTable reubicada a " + hx(r.table) + " con " + g2.count + " entradas · " + r.refs.length + " referencias repuntadas" : "") +
+      (r.expanded ? "\nROM ampliada a " + (r.rom.length >> 20) + " MB." : "") +
+      (FomtHub.inSuite ? "\nROM enviada a la suite." : "") +
+      (comp.warn.length ? "\n⚠ " + comp.warn.join("\n⚠ ") : ""));
+  } catch (e){ impMsg(e.message, true); }
+};
+$("imp-dl").onclick = () => { if (rom && gb) save(new Blob([rom]), romName.replace(/\.gba$/i, "") + "_audio.gba"); };
+
 // Desde FoMT_Suite.html la ROM llega por el puente compartido.
 FomtHub.onRom((b, name) => { if (GBA.isGba(b)) loadGba(b, name); });
 fit();
