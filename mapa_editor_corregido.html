@@ -234,9 +234,9 @@ textarea { width: 100%; height: 90px; font-family: var(--mono); font-size: 11px;
 
     <!-- EDIFICIOS (PARCHES DE LA ROM) -->
     <section class="panel" id="bldpanel" hidden>
-      <h2>Edificios (capa 3)</h2>
+      <h2>Edificios y muebles (capa 3)</h2>
       <div id="bldList"></div>
-      <p class="hint">El juego no guarda la casa, el establo ni el gallinero en las capas del mapa: los pega encima según su nivel de mejora (tabla de parches en 0x10692C). Elige un nivel para verlo y edítalo con la capa «3 (edificios)»; la subcapa indica en qué capa del juego se pegan esos tiles. La posición la fija el código del juego.</p>
+      <p class="hint">El juego no guarda en las capas del mapa lo que cambia durante la partida (casa, establo, gallinero, casas del pueblo/montaña/playa, muebles de la casa): lo pega encima desde la tabla de parches 0x10692C según el nivel o lo comprado. Elige una opción para verla y edítalo con la capa «3 (edificios)»; la subcapa indica en qué capa del juego se pegan esos tiles. La posición la fija el código del juego.</p>
     </section>
 
     <!-- WARPS / ENTRADAS REALES (COLISIÓN) -->
@@ -271,9 +271,16 @@ textarea { width: 100%; height: 90px; font-family: var(--mono); font-size: 11px;
         <button type="button" id="delPieceBtn" title="Quita la pieza capturada/importada seleccionada">Quitar pieza</button>
         <label class="chk"><input type="checkbox" id="pieceSnap" checked> Alinear a 16</label>
       </div>
+      <div class="row" style="margin-bottom:8px" role="group" aria-label="Capas de la pieza">
+        <span class="mono">Capas:</span>
+        <label class="chk"><input type="checkbox" id="pcL0" checked> 0 (suelo)</label>
+        <label class="chk"><input type="checkbox" id="pcL1" checked> 1</label>
+        <label class="chk"><input type="checkbox" id="pcL2" checked> 2</label>
+        <label class="chk" title="Al pegar, las celdas vacías (tile 0x3FF) no borran lo que hay debajo"><input type="checkbox" id="pcHoles" checked> Vacío = transparente</label>
+      </div>
       <div class="tilescroll" style="max-height:340px"><canvas id="pieces" width="10" height="10" tabindex="0" aria-label="Bloques y piezas"></canvas></div>
       <div class="status" id="pieceinfo"></div>
-      <p class="hint">Como en Advance Map: cada bloque 16×16 lleva sus 3 capas, así que al pintarlo se ve armado. Arriba están las piezas completas (edificios, zonas capturadas y PNG importados); abajo, los bloques que ya usa el mapa, ordenados por tile para que cada casa quede junta. Clic para elegir; pinta con el lápiz. Elegir un tile normal vuelve al pincel de una capa.</p>
+      <p class="hint">Como en Advance Map: cada bloque 16×16 lleva sus 3 capas, así que al pintarlo se ve armado. Las casillas «Capas» deciden qué capas se copian al capturar y cuáles se pegan (p. ej. solo la 1 para copiar un árbol sin el suelo). Arriba están las piezas completas (edificios, muebles, zonas capturadas y PNG importados); abajo, los bloques que ya usa el mapa, ordenados por tile para que cada casa quede junta. Clic para elegir; pinta con el lápiz. Elegir un tile normal vuelve al pincel de una capa.</p>
     </section>
 
     <section class="panel">
@@ -393,7 +400,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   var selectedWarpIdx = -1;
 
   // Índices de la tabla de mapas (0x105EDC), no IDs de escena. Solo los verificados en la ROM.
-  var MAP_NAMES = { 0: 'Granja', 1: 'Granja (variante)' };
+  var MAP_NAMES = { 0: 'Granja', 1: 'Granja (variante)', 6: 'Pueblo (casa en venta)', 7: 'Pueblo (variante)', 8: 'Playa', 9: 'Playa (variante)', 14: 'Montaña', 15: 'Montaña (variante)', 41: 'Casa por dentro (nivel 1)', 42: 'Casa por dentro (nivel 2)', 43: 'Casa por dentro (nivel 3)' };
   function mapName(i) { return MAP_NAMES[i] ? 'Mapa ' + i + ' · ' + MAP_NAMES[i] : 'Mapa ' + i; }
 
   // La colisión enlaza con scripts: evento -> script N; objeto -> script (objeto >> 1).
@@ -405,14 +412,48 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     return inf.w.map(function (w) { return sceneName(w[0]) + ' (' + w[1] + ',' + w[2] + ')'; }).join(' | ');
   }
 
-  /* Edificios de la granja: parches de la tabla 0x10692C que el juego pega sobre los mapas 0 y 1
-     (func_080171F8 / func_080A5BD8). El mapa 0 usa el parche par y el mapa 1 el impar. */
+  /* Parches de la tabla 0x10692C que el código pega sobre cada mapa (índice de la tabla de mapas).
+     Sacado de la tabla de saltos por mapa de func_080A6660 (0x080A685C) y de las funciones de muebles
+     0x080A6138..0x080A63B8. Cada entrada es un objeto con sus estados alternativos [parche, x, y]
+     (niveles de mejora, con/sin mueble); los nombres con «?» son aproximados. */
   var PATCH_TABLE = 0x10692C, PATCH_ENTRY = 24, PATCH_COUNT = 82;
-  var FARM_BUILDINGS = [
-    { name: 'Casa', levels: [{ p: [0, 1], x: 26, y: 3 }, { p: [2, 3], x: 18, y: 3 }, { p: [4, 5], x: 10, y: 2 }] },
-    { name: 'Establo', levels: [{ p: [6, 7], x: 58, y: 2 }, { p: [8, 9], x: 58, y: 2 }] },
-    { name: 'Gallinero', levels: [{ p: [10, 11], x: 14, y: 52 }, { p: [12, 13], x: 14, y: 52 }] }
-  ];
+  function farm(v) {
+    return [
+      { name: 'Casa', opts: [[0 + v, 26, 3], [2 + v, 18, 3], [4 + v, 10, 2]] },
+      { name: 'Establo', opts: [[6 + v, 58, 2], [8 + v, 58, 2]] },
+      { name: 'Gallinero', opts: [[10 + v, 14, 52], [12 + v, 14, 52]] }
+    ];
+  }
+  // Muebles del interior de la casa: x según el nivel (mapas 41, 42, 43).
+  function house(lv) {
+    var X = function (a) { return a[lv]; }, out = [];
+    function add(name, pats, xs, y) { if (X(xs) !== undefined) out.push({ name: name, opts: pats.map(function (p) { return [p, X(xs), y]; }) }); }
+    add('Silla / mueble del fondo? (14/15)', [15, 14], [25, 40, 54], 15);
+    add('Mesita junto a la puerta? (21/22)', [22, 21], [1, 16, 24], 17);
+    add('Caja junto a la puerta? (20)', [20], [1, 16, 24], 17);
+    add('Cocina', [23], [undefined, 2, 10], 1);
+    add('Nevera (16/17)', [17, 16], [undefined, 11, 19], 3);
+    add('Aparador (18/19)', [19, 18], [undefined, 15, 23], 2);
+    add('Chimenea', [24], [undefined, undefined, 4], 1);
+    add('Cama grande', [25], [undefined, undefined, 52], 5);
+    add('Alfombra', [26], [undefined, 23, 31], 10);
+    add('Jarrón?', [27], [19, 34, 42], 6);
+    add('Espejo', [28], [8, 23, 31], 2);
+    add('Reloj de pie', [29], [undefined, 20, 28], 3);
+    return out;
+  }
+  var MAP_PATCHES = {
+    0: farm(0), 1: farm(1),
+    6: [{ name: 'Casa del pueblo', opts: [[38, 60, 0]] }], 7: [{ name: 'Casa del pueblo', opts: [[39, 60, 0]] }],
+    8: [{ name: 'Decoración de playa (verano?)', opts: [[42, 10, 25]] }, { name: 'Casa de la playa', opts: [[40, 23, 52]] }],
+    9: [{ name: 'Casa de la playa', opts: [[41, 23, 52]] }],
+    14: [{ name: 'Casa de la montaña', opts: [[44, 36, 2]] }], 15: [{ name: 'Casa de la montaña', opts: [[45, 36, 2]] }],
+    24: [{ name: 'Objeto (52)', opts: [[52, 40, 29]] }],
+    25: [{ name: 'Objeto (46)', opts: [[46, 33, 20]] }, { name: 'Objeto (47)', opts: [[47, 33, 23]] }, { name: 'Objeto según estado (49/50/51)', opts: [[49, 12, 20], [50, 12, 20], [51, 12, 20]] }],
+    37: [{ name: 'Objeto (32)', opts: [[32, 2, 5]] }],
+    39: [{ name: 'Objeto (33)', opts: [[33, 8, 5]] }, { name: 'Objeto (34)', opts: [[34, 12, 5]] }],
+    41: house(0), 42: house(1), 43: house(2)
+  };
 
   /* Edificio activo que cubre la celda (x, y) del mapa, o null. */
   function bldAt(x, y) {
@@ -425,8 +466,13 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     return null;
   }
   /* Valor que el juego muestra en la capa l (0..2) tras pegar los edificios. */
+  // El último parche que cubre la celda y trae esa capa es el que se ve (el juego los pega en orden).
   function cellVal(l, x, y) {
-    if (vis[3]) { var h = bldAt(x, y); if (h && h.lv.layers[l]) return h.lv.layers[l][h.i]; }
+    if (vis[3] && st.buildings) for (var i = st.buildings.length - 1; i >= 0; i--) {
+      var b = st.buildings[i], lv = b.levels[b.sel];
+      if (!lv || b.hidden || !lv.layers[l]) continue;
+      if (x >= lv.x && y >= lv.y && x < lv.x + lv.w && y < lv.y + lv.h) return lv.layers[l][(y - lv.y) * lv.w + (x - lv.x)];
+    }
     return st.layers[l][y * st.w + x];
   }
   /* Valor de colisión (u32) efectivo en la celda, incluyendo edificios. */
@@ -780,7 +826,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
       var sel = document.createElement('select'); sel.id = 'bld' + bi + '_lv'; sel.setAttribute('aria-label', 'Nivel de ' + b.name);
       b.levels.forEach(function (lv, li) {
         var o = document.createElement('option'); o.value = li;
-        o.textContent = 'Nivel ' + (li + 1) + ' · parche ' + lv.patch + ' · ' + lv.w + '×' + lv.h + ' en (' + lv.x + ',' + lv.y + ')' + (lv.edited ? ' ●' : '');
+        o.textContent = (b.levels.length > 1 ? 'Opción ' + (li + 1) + ' · ' : '') + 'parche ' + lv.patch + ' · ' + lv.w + '×' + lv.h + ' en (' + lv.x + ',' + lv.y + ')' + (lv.edited ? ' ●' : '');
         sel.appendChild(o);
       });
       sel.value = b.sel;
@@ -1081,7 +1127,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   $('tsview').addEventListener('change', renderTileset);
   $('bsize').querySelectorAll('button').forEach(function (b) {
     b.addEventListener('click', function () {
-      brushSize = +b.dataset.bs;
+      brushSize = +b.dataset.bs; if (piece) selectPiece(null);
       $('bsize').querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
       renderTileset(); renderPix(); renderSwatches(); updateEntryInfo();
     });
@@ -1236,8 +1282,10 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   var piece = null, capturing = false, capStart = null, lastPieceAt = '';
   var pcv = $('pieces'), pcx = pcv.getContext('2d'), pieceHit = [];
 
-  function pieceFromArea(x0, y0, w, h, name, kind) {
+  function pieceLayersOn() { return [0, 1, 2].map(function (l) { return $('pcL' + l).checked; }); }
+  function pieceFromArea(x0, y0, w, h, name, kind, only) {
     var layers = [0, 1, 2].map(function (l) {
+      if (only && !only[l]) return null;
       var L = new Uint16Array(w * h);
       for (var j = 0; j < L.length; j++) L[j] = cellVal(l, x0 + (j % w), y0 + ((j / w) | 0));
       return L;
@@ -1271,7 +1319,7 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
           for (var j = 0; j < L.length; j++) L[j] = st.layers[k][(lv.y + ((j / lv.w) | 0)) * st.w + lv.x + (j % lv.w)];
           return L;
         });
-        out.push({ name: b.name + ' nivel ' + (li + 1), kind: 'building', w: lv.w, h: lv.h, layers: layers });
+        out.push({ name: b.name + (b.levels.length > 1 ? ' ' + (li + 1) : ''), kind: 'building', w: lv.w, h: lv.h, layers: layers });
       });
     });
     return out;
@@ -1340,10 +1388,12 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
     var a = pieceAnchor(c), key = a.x + ',' + a.y;
     if (key === lastPieceAt) return;
     lastPieceAt = key;
+    var on = pieceLayersOn(), holes = $('pcHoles').checked;
     for (var l = 0; l < 3; l++) {
-      var L = piece.layers[l]; if (!L) continue;
+      var L = piece.layers[l]; if (!L || !on[l]) continue;
       for (var j = 0; j < L.length; j++) {
         var x = a.x + (j % piece.w), y = a.y + ((j / piece.w) | 0);
+        if (holes && (L[j] & 0x3FF) === EMPTY) continue;
         if (x < st.w && y < st.h) st.layers[l][y * st.w + x] = L[j];
       }
     }
@@ -1358,7 +1408,9 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   function finishCapture(c) {
     var x0 = Math.min(capStart.x, c.x), y0 = Math.min(capStart.y, c.y), w = Math.abs(c.x - capStart.x) + 1, h = Math.abs(c.y - capStart.y) + 1;
     st.pieces = st.pieces || [];
-    var p = pieceFromArea(x0, y0, w, h, 'Captura ' + w + '×' + h + ' en (' + x0 + ',' + y0 + ')', 'capture');
+    var on = pieceLayersOn();
+    if (!on.some(Boolean)) { toast('Marca al menos una capa'); capturing = false; capStart = null; $('captureBtn').classList.remove('on'); return; }
+    var p = pieceFromArea(x0, y0, w, h, 'Captura ' + w + '×' + h + ' capas ' + [0, 1, 2].filter(function (l) { return on[l]; }).join('+') + ' en (' + x0 + ',' + y0 + ')', 'capture', on);
     st.pieces.push(p); capturing = false; capStart = null; $('captureBtn').classList.remove('on');
     selectPiece(p); toast('Pieza guardada (' + w + '×' + h + ' celdas)');
   }
@@ -1405,7 +1457,8 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   $('vf').addEventListener('change', function (e) { vflip = e.target.checked; updateEntryInfo(); });
   $('layer').addEventListener('change', function (e) {
     activeLayer = +e.target.value; $('bsubWrap').hidden = activeLayer !== 3;
-    if (activeLayer === 3 && !st.buildings) toast('Este mapa no tiene edificios. Abre el mapa 0 o 1 (Granja).');
+    if (activeLayer === 3 && piece) selectPiece(null);
+    if (activeLayer === 3 && !st.buildings) toast('Este mapa no tiene parches de edificios/muebles.');
   });
   $('zoom').addEventListener('change', function (e) { zoom = +e.target.value; applyZoom(); drawWarpOverlay(); });
   $('palsel').addEventListener('change', function (e) { palIdx = +e.target.value; renderAll(); });
@@ -2116,12 +2169,15 @@ var SCRIPT_INFO = {"scenes":{"0":"Mothers_Hill_Middle","1":"Mineral_Beach","2":"
   }
 
   function romBuildings(rom, idx) {
-    if (idx !== 0 && idx !== 1) return undefined;
-    return buildingsToJSON(FARM_BUILDINGS.map(function (b) {
-      return { name: b.name, sel: b.levels.length - 1, levels: b.levels.map(function (lv) {
-        return Object.assign(readPatch(rom, lv.p[idx]), { x: lv.x, y: lv.y });
-      }) };
-    }));
+    var list = MAP_PATCHES[idx];
+    if (!list) return undefined;
+    var e = mapTableOf(rom) + idx * MAP_ENTRY, mw = u16(rom, e + 32), mh = u16(rom, e + 34);
+    var out = list.map(function (b) {
+      var levels = b.opts.map(function (o) { return Object.assign(readPatch(rom, o[0]), { x: o[1], y: o[2] }); })
+        .filter(function (lv) { return lv.w && lv.h && lv.x + lv.w <= mw && lv.y + lv.h <= mh; });
+      return { name: b.name, sel: b.name === 'Casa' || b.name === 'Establo' || b.name === 'Gallinero' ? levels.length - 1 : 0, levels: levels };
+    }).filter(function (b) { return b.levels.length; });
+    return out.length ? buildingsToJSON(out) : undefined;
   }
 
   function romMap(rom, idx) {
