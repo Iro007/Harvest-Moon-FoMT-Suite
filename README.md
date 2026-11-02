@@ -14,6 +14,7 @@ Abre **[`FoMT_Suite.html`](./FoMT_Suite.html)** con doble clic (Chrome, Edge o F
 | :--- | :--- | :--- |
 | **Mapas** | [`herramientas/mapas.html`](./herramientas/mapas.html) | Capas 0–2 y **capa 3 de edificios/muebles** (los parches que el juego pega según lo comprado), colisión, **warps con su destino real**, bloques 16×16 de 3 capas al estilo Advance Map, piezas (capturar por capas, edificios, PNG importados), tiles nuevos, **mapas nuevos**, exportar PNG e inyectar en la ROM (ampliada a 32 MB). |
 | **Textos, NPC y retratos** | [`herramientas/textos_npc.html`](./herramientas/textos_npc.html) | Traducción de diálogos, eventos nuevos, hablantes, retratos e importación de retratos desde imágenes; genera ROM e IPS. |
+| **Sprites** | [`herramientas/sprites.html`](./herramientas/sprites.html) | **Sprites de NPC animados en sus 4 poses** (abajo, arriba, izquierda, derecha) y **retratos**, leídos de la ROM real. Exportar e **importar hojas PNG** (con la paleta actual o una sacada del PNG), **NPC nuevos** y **retratos nuevos** a partir de una plantilla; verifica la ROM generada releyéndola desde los punteros del juego. |
 | **Audio** | [`herramientas/audio.html`](./herramientas/audio.html) | Música y efectos de **FoMT (motor m4a/Sappy de GBA)** y de Harvest Moon DS (SDAT): reproducir, silenciar/solo por pista, velocidad, transposición, exportar WAV y MIDI, escuchar las muestras. **Importar MIDI** a la ROM de GBA (canción o efecto nuevo, o reemplazar uno existente) con un voicegroup existente o uno nuevo con muestras WAV. |
 
 Cada herramienta también funciona sola. Se comunican con la suite por `postMessage` a través de [`herramientas/fomt-hub.js`](./herramientas/fomt-hub.js), así que no hace falta servidor ni compilar nada. Para añadir una herramienta nueva: crea su HTML en `herramientas/`, incluye `fomt-hub.js`, llama a `FomtHub.onRom(...)` para recibir la ROM y a `FomtHub.publish(...)` tras inyectar, y añádela a `TOOLS` en `FoMT_Suite.html`.
@@ -26,6 +27,9 @@ Cada herramienta también funciona sola. Se comunican con la suite por `postMess
 | Tabla de parches (edificios y muebles) | `0x10692C` | 82 entradas de 24 bytes (ancho, alto, 3 capas u16 sin comprimir, tipos y rejilla de colisión). El mapa de cada parche sale de la tabla de saltos por mapa en `0x080A685C`. |
 | Colisión → scripts | — | Campo «evento» = nº de script (salidas); campo «objeto» ÷ 2 = nº de script (puertas). El destino es el `Warp_Player(escena, x, y)` de ese script. |
 | Tabla de canciones m4a | `0x13ABF0` | 211 entradas de 8 bytes {canción, reproductor, reproductor} (`gSongTable` en la decomp de StanHash). Reproductor 0 = música, 3 = efectos; hay 5 reproductores de 8 pistas (`gMusicPlayerTable`, `0x13ABB4`). La apuntan 11 literales: `0x8B84`, `0x8BAC`, `0x8BCC`, `0x8D58`, `0x8D6C`, `0x8D80` (`asm/hardware.s`) y `0xD2300`, `0xD2334`, `0xD2380`, `0xD23D4`, `0xD2408` (`m4aSongNum*` en `src/m4a.c`). Al añadir canciones se copia ampliada al espacio libre y se repuntan los 11; el audio la relee desde `0xD2300`. |
+| Banco de sprites | `0x58BA28` (`gUnk_0858BA28`) | 7 secciones seguidas, cada una `u16 cantidad, u16 0` + entradas (lo lee `func_0805E6CC`): animaciones (2551 × 4 B: nº de pasos, primer paso), fotogramas (3009 × 16 B: nº/1er OAM, nº/1er tile, nº/1ª paleta, nº/1º extra), OAM (4795 × 8 B, attr0–2 de GBA), tiles 4bpp (24398 × 32 B), paletas (162 × 32 B), extra (0) y pasos (3990 × 4 B: fotograma, duración en frames). Lo apuntan 29 literales del código (`0xCC8`, `0x52714`, …, `0xC11D8`, lista en `sprites.html`). |
+| Banco de retratos | `0x52D984` (`gUnk_0852D984`) | Mismo formato; 184 animaciones = 184 IDs de retrato. Lo apuntan 3 literales: `0xADC7C`, `0xADD00`, `0xADD3C`. |
+| Dirección de un NPC | — | `AActorEntity::RefreshSprite(anim_id + facing)` (`StanHash_fomt/src/entity_actor.cc`): un NPC son 4 animaciones seguidas, base + 0 abajo, + 1 arriba, + 2 izquierda, + 3 derecha (derecha suele reutilizar los tiles de izquierda con OAM espejados). |
 
 ### Importar MIDI (audio, GBA)
 **Importar MIDI a la ROM…** (columna derecha de `audio.html`, con una ROM de GBA abierta):
@@ -35,9 +39,15 @@ Cada herramienta también funciona sola. Se comunican con la suite por `postMess
 - **Destino**: reemplazar una canción o efecto (solo cambia su entrada de `gSongTable`) o añadir uno nuevo (copia `gSongTable` ampliada y repunta sus 11 referencias). Todo se escribe tras el último byte que no es `0x00`/`0xFF`, la cabecera va al final (acaba en un puntero) y, si no cabe, la ROM se amplía a 16 o 32 MB.
 - Al terminar relee la ROM generada, reproduce la canción y la envía a la suite con `FomtHub.publish`; también se puede descargar.
 
+### Sprites y retratos (`sprites.html`)
+- **Visor**: la lista agrupa las animaciones consecutivas con la misma paleta («personajes»; los nombres son aproximados, del catálogo de FOMT_Studio). Los grupos de 4 direcciones se detectan en la ROM (la pose 3 reutiliza los tiles de la 2 con otro OAM) y se reproducen en bucle con sus duraciones reales.
+- **Hoja PNG**: una fila por animación, una columna por fotograma que no salió antes, celdas del tamaño del personaje. Al importar, cada píxel vuelve al tile que lo dibuja; con «paleta del PNG» se calculan hasta 15 colores y se avisa si otras animaciones comparten esa paleta.
+- **NPC / retratos nuevos**: copia el personaje plantilla (animaciones, pasos, fotogramas, tiles y paleta propios; los OAM se comparten) al final de su banco, escribe el banco ampliado en el espacio libre (tras el último `0xFF` final; se amplía la ROM por MB si no cabe; termina con la marca `FMSP`) y repunta sus literales. El NPC nuevo tiene su anim base (+0…+3 = direcciones); el retrato nuevo, su ID = nº de animación.
+- **Generar ROM**: relee la ROM desde los punteros del código y compara cada animación (fotograma a fotograma, píxel y color) con la ROM de partida o con lo importado; si algo difiere no deja descargar. `textos_npc.html` localiza el banco de retratos por su puntero, así que ve los retratos nuevos.
+
 ### Pendiente
 - Editar el destino de un warp (requiere recompilar el script) y que una escena cargue un mapa nuevo.
-- NPC: añadir NPC y retratos nuevos, visor de sprites con las 4 poses animadas y sprites nuevos; capa de NPC y rutas en el editor de mapas.
+- NPC: que el juego coloque y mueva un NPC nuevo (tabla de NPC, horarios y scripts que usen su anim base) y que los diálogos usen los IDs de retrato nuevos; rutas en el editor de mapas.
 - Audio: que el juego llame a las canciones nuevas (#211 en adelante) desde sus scripts; hoy suenan en el juego las que reemplazan a una existente.
 
 ---

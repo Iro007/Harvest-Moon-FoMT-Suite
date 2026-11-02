@@ -55,6 +55,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
     <button data-tool="home" class="on">Inicio</button>
     <button data-tool="mapas">Mapas</button>
     <button data-tool="textos">Textos, NPC y retratos</button>
+    <button data-tool="sprites">Sprites</button>
     <button data-tool="audio">Audio</button>
   </nav>
   <span class="grow"></span>
@@ -71,6 +72,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
     <div class="cards">
       <button class="card" data-tool="mapas"><b>Mapas</b><span>Capas 0–2, edificios y muebles (capa 3), colisión, warps con su destino, bloques 16×16, piezas, tiles nuevos, mapas nuevos y PNG.</span></button>
       <button class="card" data-tool="textos"><b>Textos, NPC y retratos</b><span>Traducción de diálogos, eventos nuevos, hablantes, retratos e importación de imágenes de retrato.</span></button>
+      <button class="card" data-tool="sprites"><b>Sprites</b><span>Sprites de NPC animados en 4 poses y retratos leídos de la ROM; importar hojas PNG, NPC nuevos y retratos nuevos.</span></button>
       <button class="card" data-tool="audio"><b>Audio</b><span>Música y efectos de FoMT (motor m4a de GBA) y de Harvest Moon DS: reproducir, silenciar pistas, exportar WAV y MIDI.</span></button>
     </div>
   </div></div>
@@ -78,8 +80,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 <script>
 (function () {
   'use strict';
-  var TOOLS = { mapas: 'herramientas/mapas.html', textos: 'herramientas/textos_npc.html', audio: 'herramientas/audio.html' };
-  var NAMES = { mapas: 'Mapas', textos: 'Textos, NPC y retratos', audio: 'Audio' };
+  var TOOLS = { mapas: 'herramientas/mapas.html', textos: 'herramientas/textos_npc.html', sprites: 'herramientas/sprites.html', audio: 'herramientas/audio.html' };
+  var NAMES = { mapas: 'Mapas', textos: 'Textos, NPC y retratos', sprites: 'Sprites', audio: 'Audio' };
   var frames = {}, ready = {}, rom = null, romName = '', sent = {}, current = 'home';
   var $ = function (id) { return document.getElementById(id); };
 

@@ -542,7 +542,7 @@ const hexu8 = h => Uint8Array.from(h.match(/../g) || [], x => parseInt(x, 16));
 function applyPortPatches(b){ for (const [o, h] of Object.entries(PORTPATCH)) { const off = +o; if (off + 32 <= b.length) b.set(hexu8(h), off); } }
 function savePortPatches(){ try { localStorage.setItem(PKEY, JSON.stringify(PORTPATCH)); } catch (e) { alert("No se pudo guardar los retratos importados en este navegador (¿sin espacio?). Genera la ROM antes de cerrar la página."); } }
 function portCont(buf){
-  const v = new DataView(buf.buffer || buf, buf.byteOffset || 0), u16 = o => v.getUint16(o, true); let p = PORT_BASE; const ofs = [], cs = [];
+  const v = new DataView(buf.buffer || buf, buf.byteOffset || 0), u16 = o => v.getUint16(o, true); let p = portBase(v); const ofs = [], cs = [];
   for (const sz of SEC) { const c = u16(p); ofs.push(p + 4); cs.push(c); p += 4 + c * sz; }
   return {u16, ofs, cs, u8: o => v.getUint8(o)};
 }
@@ -629,12 +629,14 @@ function restorePortraitGroup(g){
 
 // ---------------------------------------------------------------- ROM → retratos
 const PORT_BASE = 0x52D984, ROM_SHA1 = "a2fc3574f0a65a4fcf7682fb274b9d7eebdef963";
+// el banco de retratos se localiza por su puntero en el código (0x080ADD00): sprites.html puede reubicarlo para añadir retratos
+const portBase = v => { const p = v.getUint32(0xADD00, true) - 0x08000000; return p > 0 && p + 64 <= v.byteLength ? p : PORT_BASE; };
 const SEC = [4, 16, 8, 32, 32, 8, 4];
 const OBJ_SZ = {"0,0":[8,8],"0,1":[16,16],"0,2":[32,32],"0,3":[64,64],"1,0":[16,8],"1,1":[32,8],"1,2":[32,16],"1,3":[64,32],"2,0":[8,16],"2,1":[8,32],"2,2":[16,32],"2,3":[32,64]};
 function parseRomPortraits(buf){
   const v = new DataView(buf), u16 = o => v.getUint16(o, true), u8 = o => v.getUint8(o);
-  if (buf.byteLength < PORT_BASE + 64) throw new Error("El archivo es demasiado pequeño para ser la ROM.");
-  let p = PORT_BASE; const ofs = [], cs = [];
+  if (buf.byteLength < 0xADD04) throw new Error("El archivo es demasiado pequeño para ser la ROM.");
+  let p = portBase(v); const ofs = [], cs = [];
   for (const sz of SEC) {
     const c = u16(p); if (u16(p + 2) !== 0 || p + 4 + c * sz > buf.byteLength) throw new Error("No encuentro los retratos en esta ROM (¿no es la versión USA?).");
     ofs.push(p + 4); cs.push(c); p += 4 + c * sz;

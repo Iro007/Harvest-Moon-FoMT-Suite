@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprites de NPC y retratos</title>
+<style>
+:root{
+  --bg:#14171a; --panel:#1b1f23; --panel2:#22272c; --line:#2f353b;
+  --ink:#e6e3dc; --mute:#8b9298; --acc:#5fc4b0; --acc2:#e0b45a; --bad:#e07a6a;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,monospace;
+  --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);display:flex;flex-direction:column;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:none;flex-wrap:wrap}
+header h1{font-size:15px;margin:0;font-weight:650}
+header .sub{color:var(--mute);font-size:12px}
+#romst{color:var(--mute);font-size:12px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--acc)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--acc);color:#0c1613;border-color:var(--acc);font-weight:600}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc2);outline-offset:1px}
+main{flex:1;display:grid;grid-template-columns:270px 1fr 320px;min-height:0}
+.col{overflow:auto;min-height:0;background:var(--panel)}
+.col.l{border-right:1px solid var(--line)} .col.r{border-left:1px solid var(--line)}
+.tabs{display:flex;position:sticky;top:0;background:var(--panel);z-index:2;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:9px 4px;cursor:pointer;color:var(--mute)}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--acc)}
+.search{padding:8px 10px;border-bottom:1px solid var(--line);position:sticky;top:37px;background:var(--panel);z-index:2}
+.search input[type=search]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.search label{display:block;font-size:12px;color:var(--mute);margin-top:6px}
+.item{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:6px 12px;cursor:pointer}
+.item:hover{background:var(--panel2)} .item.on{background:var(--panel2);border-left-color:var(--acc)}
+.item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item small{color:var(--mute);font-family:var(--mono);font-size:11px;white-space:nowrap}
+.item .new{color:var(--acc2)}
+.empty{padding:28px 18px;color:var(--mute)} .empty strong{color:var(--ink)}
+#stage{overflow:auto;min-height:0;padding:16px 20px}
+#stage h2{margin:0 0 2px;font-size:17px}
+.meta{color:var(--mute);font-size:12px;font-family:var(--mono)}
+.sw{display:inline-flex;vertical-align:middle;margin-left:8px}.sw i{width:12px;height:12px;border:1px solid var(--line);display:block}
+.sets{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 8px}
+.sets button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
+.sets button.on{border-color:var(--acc);color:var(--acc)}
+.poses{display:flex;gap:14px;flex-wrap:wrap}
+.pose{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.pose b{display:block;font-size:13px}.pose small{color:var(--mute);font-family:var(--mono);font-size:11px}
+canvas.pl{image-rendering:pixelated;display:block;margin:6px auto;background:
+  repeating-conic-gradient(#2b4a2e 0 25%,#27432a 0 50%) 0 0/16px 16px;border-radius:4px}
+h3{font-size:12px;font-weight:600;color:var(--mute);margin:22px 0 8px;text-transform:uppercase;letter-spacing:.04em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.cell{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center;min-width:0}
+.cell small{display:block;color:var(--mute);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side{padding:12px 14px;border-bottom:1px solid var(--line)}
+.side h4{margin:0 0 6px;font-size:13px}
+.side p{margin:4px 0;color:var(--mute);font-size:12px}
+.side label{display:block;color:var(--mute);font-size:12px;margin:8px 0 3px}
+.side select,.side input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.side input[type=file]{width:100%;font-size:12px}
+.side .btn{margin-top:8px}
+.msg{font-size:12px;margin-top:8px;white-space:pre-wrap}
+.ok{color:var(--acc)} .bad{color:var(--bad)}
+.log{font-size:12px;color:var(--mute);padding-left:18px;margin:6px 0}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog .dh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+dialog .dh h3{margin:0;font-size:15px;flex:1;color:var(--ink);text-transform:none;letter-spacing:0}
+dialog .db{overflow:auto;padding:10px 16px;max-height:60vh}
+dialog .db li{margin:3px 0}
+dialog .df{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--line)}
+@media(max-width:1000px){main{grid-template-columns:200px 1fr}.col.r{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line)}main{grid-auto-rows:minmax(0,1fr) auto}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Sprites de NPC y retratos</h1><div class="sub">FoMT (GBA, USA) — animaciones en 4 poses y retratos leídos de la ROM real; importar PNG, NPC y retratos nuevos</div></div>
+  <div style="flex:1"></div>
+  <span id="romst">Sin ROM</span>
+  <label class="btn" for="rom-in">Abrir ROM (.gba)</label>
+  <input id="rom-in" type="file" accept=".gba" hidden>
+  <button class="btn primary" id="genbtn" disabled>Generar ROM</button>
+</header>
+<main>
+  <section class="col l" aria-label="Personajes">
+    <div class="tabs" role="tablist"><button class="on" data-tab="spr">Sprites</button><button data-tab="por">Retratos</button></div>
+    <div class="search"><input id="q" type="search" placeholder="Buscar personaje o anim (0x22F)…" aria-label="Buscar">
+      <label><input type="checkbox" id="only4" checked> solo con 4 direcciones</label></div>
+    <div id="list"><div class="empty"><strong>Abre la ROM</strong> (o cárgala en la suite) para ver los sprites y retratos.</div></div>
+  </section>
+  <section id="stage" aria-label="Vista"><div class="empty">Elige un personaje de la lista.</div></section>
+  <section class="col r" id="side" aria-label="Acciones"></section>
+</main>
+<dialog id="gendlg">
+  <div class="dh"><h3>Generar ROM</h3><button class="btn" id="genclose">Cerrar</button></div>
+  <div class="db" id="genbody"></div>
+  <div class="df" id="genfoot"></div>
+</dialog>
+<script>
+/* Nombres aproximados de las animaciones (catálogo comunitario de FOMT_Studio y portraits.json de FIO-DECOMP): solo etiquetas, los datos salen de la ROM */
+const NAMES_SPR = ["","","","","","","","","","","","","","","","Bee_Down","Bee_Base","Bee_Down","Bee_Left","Bee_Right","Bee_Stop","Scarab_Down","Scarab_Base","Scarab_Left","Scarab_Right","Axe_Charge_1_Base","Axe_Charge_1_Down","Axe_Charge_1_Left","Axe_Charge_1_Right","Axe_Charge_2_Base","Axe_Charge_2_Down","Axe_Charge_2_Left","Axe_Charge_2_Right","Axe_Charge_3_Base","Axe_Charge_3_Down","Axe_Charge_3_Left","Axe_Charge_3_Right","Axe_Charge_4_Base","Axe_Charge_4_Down","Axe_Charge_4_Left","Axe_Charge_4_Right","Axe_Charge_5_Base","Axe_Charge_5_Down","Axe_Charge_5_Left","Axe_Charge_5_Right","Axe_Charge_6_Base","Axe_Charge_6_Down","Axe_Charge_6_Left","Axe_Charge_6_Right","Axe_Charge_7_Base","Axe_Charge_7_Down","Axe_Charge_7_Left","Axe_Charge_7_Right","Axe_Use_Base","Axe_Use_Down","Axe_Use_Left","Axe_Use_Right","Axe_Charged_Release_Base","Axe_Charged_Release_Down","Axe_Charged_Release_Left","Axe_Charged_Release_Right","Player_Stop_Base","Player_Stop_Down","Player_Stop_Left","Player_Stop_Right","Withdraw_Tool_1","Withdraw_Tool_2","Withdraw_Tool_3","Withdraw_Tool_4","Drimk_1","Drimk_2","Drimk_3","Drimk_4","Dizzy_1","Dizzy_2","Dizzy_3","Dizzy_4","Eat_1","Eat_2","Eat_3","Eat_4","Fishing_Road_Charge_1_Down","Fishing_Road_Charge_1_Base","Fishing_Road_Charge_1_Left","Fishing_Road_Charge_1_Right","Fishing_Road_Charge_2_Down","Fishing_Road_Charge_2_Base","Fishing_Road_Charge_2_Left","Fishing_Road_Charge_2_Right","Fishing_Road_Charge_3_Down","Fishing_Road_Charge_3_Base","Fishing_Road_Charge_3_Left","Fishing_Road_Charge_3_Right","Fishing_Road_Charge_4_Down","Fishing_Road_Charge_4_Base","Fishing_Road_Charge_4_Left","Fishing_Road_Charge_4_Right","Fishin_Road_Charge_5_Down","Fishin_Road_Charge_5_Base","Fishin_Road_Charge_5_Left","Fishin_Road_Charge_5_Right","Fishing_Road_Charge_6_Down","Fishing_Road_Charge_6_Base","Fishing_Road_Charge_6_Left","Fishing_Road_Charge_6_Right","Fishing_Road_Charge_7_Down","Fishing_Road_Charge_7_Base","Fishing_Road_Charge_7_Left","Fishing_Road_Charge_7_Right","Fishing_Road_Catch_Down","Fishing_Road_Catch_Base","Fishing_Road_Catch_Left","Fishing_Road_Catch_Right","Fishing_Road_Collect_Fish_Down","Fishing_Road_Collect_Fish_Base","Fishing_Road_Collect_Fish_Left","Fishing_Road_Collect_Fish_Right","Fishing_Road_Waithing_Down","Fishing_Road_Waithing_Base","Fishing_Road_Waithing_Left","Fishing_Road_Waithing_Right","Fishing_Rod_Normal_release_Down","Fishing_Rod_Normal_release_Base","Fishing_Rod_Normal_release_Left","Fishing_Rod_Normal_release_Right","Player_Weeding_Kiss_1","Player_Weeding_Kiss_2","Player_Weeding_Kiss_3","Player_Weeding_Kiss_4","Player_Weeding_Wait_Down","Player_Weeding_Wait_Base","Player_Weeding_Wait_Left","Player_Weeding_Wait_Right","Player_Weeding_Walk_Down","Player_Weeding_Walk_Base","Player_Weeding_Walk_Left","Player_Weeding_Walk_Right","Player_Frisbee_Charge_1","Player_Frisbee_Charge_2","Player_Frisbee_Charge_3","Player_Frisbee_Charge_4","Player_Firsbee_Charge_5","Player_Frisbee_Charge_6","Player_Frisbee_Charge_7","Player_Frisbee_Charge_8","Player_Frisbee_Move_1","Player_Frisbee_Move_2","Player_Frisbee_Move_3","Player_Frisbee_Move_4","Player_Frisbee_Release_1","Player_Frisbee_Release_2","Player_Frisbee_Release_3","Player_Frisbee_Release_4","Player_Down_To_Horse_Down","Player_Down_To_Horse_Base","Player_Down_To_Horse_Left","Player_Down_To_Horse_Right","Hammer_Charge_1_Down","Hammer_Charge_1_Base","Hammer_Charge_1_Left","Hammer_Charge_1_Right","Hammer_Charge_2_Down","Hammer_Charge_2_Base","Hammer_Charge_2_Left","Hammer_Charge_2_Right","Hammer_Charge_3_Down","Hammer_Charge_3_Base","Hammer_Charge_3_Left","Hammer_Charge_3_Right","Hammer_Charge_4_Down","Hammer_Charge_4_Base","Hammer_Charge_4_Left","Hammer_Charge_4_Right","Hammer_Charge_5_Down","Hammer_Charge_5_Base","Hammer_Charge_5_Left","Hammer_Charge_5_Right","Hammer_Charge_6_Down","Hammer_Charge_6_Base","Hammer_Charge_6_Left","Hammer_Charge_6_Right","Hammer_Charge_7_Down","Hammer_Charge_7_Base","Hammer_Charge_7_Left","Hammer_Charge_7_Right","Hammer_Normal_Use_Down","Hammer_Normal_Use_Base","Hammer_Normal_Use_Left","Hammer_Normal_Use_Right","Hammer_Charged_Use_Down","Hammer_Charged_Use_Base","Hammer_Charged_Use_Left","Hammer_Charged_Use_Right","Hoe_Charge_1_Down","Hoe_Charge_1_Base","Hoe_Charge_1_Left","Hoe_Charge_1_Right","Hoe_Charge_2_Down","Hoe_Charge_2_Base","Hoe_Charge_2_Left","Hoe_Charge_2_Right","Hoe_Charge_3_Down","Hoe_Charge_3_Base","Hoe_Charge_3_Left","Hoe_Charge_3_Right","Hoe_Charge_4_Down","Hoe_Charge_4_Base","Hoe_Charge_4_Left","Hoe_Charge_4_Right","Hoe_Charge_5_Down","Hoe_Charge_5_Base","Hoe_Charge_5_Left","Hoe_Charge_5_Right","Hoe_Charge_6_Down","Hoe_Charge_6_Base","Hoe_Charge_6_Left","Hoe_Charge_6_Right","Hoe_Charge_7_Down","Hoe_Charge_7_Base","Hoe_Charge_7_Left","Hoe_Charge_7_Right","Hoe_Normal_Use_Down","Hoe_Normal_Use_Base","Hoe_Normal_Use_Left","Hoe_Normal_Use_Right","Riding_Horse_Fast_Down","Riding_Horse_Fast_Base","Riding_Horse_Fast_Left","Riding_Horse_Fast_Right","Riding_Horse_Slow_Down","Riding_Horse_Slow_Base","Riding_Horse_Slow_Left","Riding_Horse_Slow_Right","Riding_Horse_Stop_Down","Riding_Horse_Stop_Base","Riding_Horse_Stop_Left","Riding_Horse_Stop_Right","Riding_Horse_Walk_Down","Riding_Horse_Walk_Base","Riding_Horse_Walk_Left","Riding_Horse_Walk_Right","Hot_Spring_Bath_1","Hot_Spring_Bath_2","Hot_Spring_Bath_3","Hot_Spring_Bath_4","Hot_Spring_Sleep_1","Hot_Spring_Sleep_2","Hot_Spring_Sleep_3","Hot_Spring_Sleep_4","Player_Over_Work_1","Player_Over_Work_2","Player_Over_Work_3","Player_Over_Work_4","Player_Over_Work_Sit_1","Player_Over_Work_Sit_2","Player_Over_Work_Sit_3","Player_Over_Work_Sit_4","Player_Back_Hurt_1","Player_Back_Hurt_2","Player_Back_Hurt_3","Player_Back_Hurt_4","Player_Sweaty_1","Player_Sweaty_2","Player_Sweaty_3","Player_Sweaty_4","Player_Middle_Jump_Down","Player_Middle_Jump_Base","Player_Middle_Jump_Left","Player_Middle_Jump_Right","Player_High_Jump_Down","Player_High_Jump_Base","Player_High_Jump_Left","Player_High_Jump_Right","Player_Sleep_In_Floor_1","Player_Sleep_In_Floor_2","Player_Sleep_In_Floor_3","Player_Sleep_In_Floor_4","Player_Wake_Down_In_Floor_1","Player_Wake_Down_In_Floor_2","Player_Wake_Down_In_Floor_3","Player_Wake_Down_In_Floor_4","Player_OverWork_B_1","Player_OverWork_B_2","Player_OverWork_B_3","Player_OverWork_B_4","Player_Colapse_Head_Hurt_1","Player_Colapse_Head_Hurt_2","Player_Colapse_Head_Hurt_3","Player_Colapse_Head_Hurt_4","Player_Head_Hurt_1","Player_Head_Hurt_2","Player_Head_Hurt_3","Player_Head_Hurt_4","Player_Head_No_Down","Player_Head_No_Base","Player_Head_No_Left","Player_Head_No_Right","Hot_Spring_Enter_1","Hot_Spring_Enter_2","Hot_Spring_Enter_3","Hot_Spring_Enter_4","Player_Ocarine_1","Player_Ocarine_2","Player_Ocarine_3","Player_Ocarine_4","Player_Move_Animal_Down","Player_Move_Animal_Base","Player_Move_Animal_Left","Player_Move_Animal_Right","Player_Move_Animal_Stop_Down","Player_Move_Animal_Stop_Base","Player_Move_Animal_Stop_Left","Player_Move_Animal_Stop_Right","Player_Ruckstar_Deposit_Down","Player_Ruckstar_Deposit_Base","Player_Ruckstar_Deposit_Left","Player_Ruckstar_Deposit_Right","Player_Ruckstar_Withdraw_Down","Player_Ruckstar_Withdraw_Base","Player_Ruckstar_Withdraw_Left","Player_Ruckstar_Withdraw_Right","Ruckstar_Withdraw_2_Down","Ruckstar_Withdraw_2_Base","Ruckstar_Withdraw_2_Left","Ruckstar_Withdraw_2_Right","Player_Hands_Middle_Stop_Down","Player_Hands_Middle_Stop_Base","Player_Hands_Middle_Stop_Left","Player_Hands_Middle_Stop_Right","Player_Bed_Jump_Down","Player_Bed_Jump_Base","Player_Bed_Jump_Left","Player_Bed_Jump_Right","Player_Item_Hands_Run_Down","Player_Item_Hands_Run_Base","Player_Item_Hands_Run_Left","Player_Item_Hands_Run_Right","Player_Item_Hands_Stop_Down","Player_Item_Hands_Stop_Base","Player_Item_Hands_Stop_Left","Player_Item_Hands_Stop_Right","Player_Item_Hands_Walk_Down","Player_Item_Hands_Walk_Base","Player_Item_Hands_Walk_Left","Player_Item_Hands_Walk_Right","Player_Down_To_Horse_B_Down","Player_Down_To_Horse_B_Base","Player_Down_To_Horse_B_Left","Player_Down_To_Horse_B_Right","Player_Run_Down","Player_Run_Base","Player_Run_Left","Player_Run_Right","Shadow_Anim_1","Shadow_Anim_2","Shadow_Anim_3","Shadow_Anim_4","Sickle_Charge_1_Down","Sickle_Charge_1_Base","Sickle_Charge_1_Left","Sickle_Charge_1_Right","Sickle_Charge_2_Down","Sickle_Charge_2_Base","Sickle_Charge_2_Left","Sickle_Charge_2_Right","Sickle_Charge_3_Down","Sickle_Charge_3_Base","Sickle_Charge_3_Left","Sickle_Charge_3_Right","Sickle_Charge_4_Down","Sickle_Charge_4_Base","Sickle_Charge_4_Left","Sickle_Charge_4_Right","Sickle_Charge_5_Down","Sickle_Charge_5_Base","Sickle_Charge_5_Left","Sickle_Charge_5_Right","Sickle_Charge_6_Down","Sickle_Charge_6_Base","Sickle_Charge_6_Left","Sickle_Charge_6_Right","Sickle_Charge_7_Down","Sickle_Charge_7_Base","Sickle_Charge_7_Left","Sickle_Charge_7_Right","Sickle_Charged_Use_Down","Sickle_Charged_Use_Base","Sickle_Charged_Use_Left","Sickle_Charged_Use_Right","Sickle_Midle_Charge_Use_Down","Sickle_Midle_Charge_Use_Base","Sickle_Midle_Charge_Use_Left","Sickle_Midle_Charge_Use_Right","Sickle_Normal_Use_Down","Sickle_Normal_Use_Base","Sickle_Normal_Use_Left","Sickle_Normal_Use_Right","Shadwow_AnimB_1","Shadwow_AnimB_2","Shadwow_AnimB_3","Shadwow_AnimB_4","Player_Stop_Down","Player_Stop_Base","Player_Stop_Left","Player_Stop_Right","Player_Turn_To_Sleep_In_Floor_1","Player_Turn_To_Sleep_In_Floor_2","Player_Turn_To_Sleep_In_Floor_3","Player_Turn_To_Sleep_In_Floor_4","Player_Rise_Hand_1","Player_Rise_Hand_2","Player_Rise_Hand_3","Player_Rise_Hand_4","Player_Middle_Hand_StopB_1","Player_Middle_Hand_StopB_2","Player_Middle_Hand_StopB_3","Player_Middle_Hand_StopB_4","Player_Animal_Medicine_Use_Down","Player_Animal_Medicine_Use_Base","Player_Animal_Medicine_Use_Left","Player_Animal_Medicine_Use_Right","Player_Bell_Use_Down","Player_Bell_Use_Base","Player_Bell_Use_Left","Player_Bell_Use_Right","Player_Brush_Use_Down","Player_Brush_Use_Base","Player_Brush_Use_Left","Player_Brush_Use_Right","Player_Sheep_Miracle_Potion_Down","Player_Sheep_Miracle_Potion_Base","Player_Sheep_Miracle_Potion_Left","Player_Sheep_Miracle_Potion_Right","Player_Sicksors_Use_Down","Player_Sicksors_Use_Base","Player_Sicksors_Use_Left","Player_Sicksors_Use_Right","Player_Milkker_Use_Down","Player_Milkker_Use_Base","Player_Milkker_Use_Left","Player_Milkker_Use_Right","Player_Seed_Use_Down","Player_Seed_Use_Base","Player_Seed_Use_Left","Player_Seed_Use_Right","Player_Cow_Miracle_Potion_Down","Player_Cow_Miracle_Potion_Base","Player_Cow_Miracle_Potion_Left","Player_Cow_Miracle_Potion_Right","Player_happy_Jump_1","Player_happy_Jump_2","Player_happy_Jump_3","Player_happy_Jump_4","Player_Walking_Down","Player_Walking_Base","Player_Walking_Left","Player_Walking_Right","Player_Lift_Crop_Down","Player_Lift_Crop_Base","Player_Lift_Crop_Left","Player_Lift_Crop_Right","Player_Watering_Can_Charge_1_Down","Player_Watering_Can_Charge_1_Base","Player_Watering_Can_Charge_1_Left","Player_Watering_Can_Charge_1_Right","Player_Watering_Can_Charge_2_Down","Player_Watering_Can_Charge_2_Base","Player_Watering_Can_Charge_2_Left","Player_Watering_Can_Charge_2_Right","Player_Watering_Can_Charge_3_Down","Player_Watering_Can_Charge_3_Base","Player_Watering_Can_Charge_3_Left","Player_Watering_Can_Charge_3_Right","Player_Watering_Can_Charge_4_Down","Player_Watering_Can_Charge_4_Base","Player_Watering_Can_Charge_4_Left","Player_Watering_Can_Charge_4_Right","Player_Watering_Can_Charge_5_Down","Player_Watering_Can_Charge_5_Base","Player_Watering_Can_Charge_5_Left","Player_Watering_Can_Charge_5_Right","Player_Watering_Can_Charge_6_Down","Player_Watering_Can_Charge_6_Base","Player_Watering_Can_Charge_6_Left","Player_Watering_Can_Charge_6_Right","Player_Watering_Can_Charge_7_Down","Player_Watering_Can_Charge_7_Base","Player_Watering_Can_Charge_7_Left","Player_Watering_Can_Charge_7_Right","Player_Watering_Can_Refill_Down","Player_Watering_Can_Refill_Base","Player_Watering_Can_Refill_Left","Player_Watering_Can_Refill_Right","Player_Watering_Can_Use_down","Player_Watering_Can_Use_Base","Player_Watering_Can_Use_Left","Player_Watering_Can_Use_Right","Player_Watering_Can_Charged_Use_Down","Player_Watering_Can_Charged_Use_Base","Player_Watering_Can_Charged_Use_Left","Player_Watering_Can_Charged_Use_Right","Player_Wathering_Can_Middle_Charged_Use_Down","Player_Wathering_Can_Middle_Charged_Use_Base","Player_Wathering_Can_Middle_Charged_Use_Left","Player_Wathering_Can_Middle_Charged_Use_Right","Player_Whistling_Down","Player_Whistling_Base","Player_Whistling_Left","Player_Whistling_Right","Player_See_Down","Player_See_Base","Player_See_Left","Player_See_Right","Buttefly_Down","Buttefly_Base","Buttefly_Left","Buttefly_Right","Butterfly_Stop","Cat_Stop_Down","Cat_Stop_Base","Cat_Stop_Left","Cat_Stop_Right","Cat_Walking_Down","Cat_Walking_Base","Cat_Walking_Left","Cat_Walking_Right","Cat_Cleaning_1","Cat_Cleaning_2","Cat_Cleaning_3","Cat_Cleaning_4","Rick_Stop_Down","Rick_Stop_Base","Rick_Stop_Left","Rick_Stop_Right","Rick_Walking_Down","Rick_Walking_Base","Rick_Walking_Left","Rick_Walking_Right","Rick_Hands_Middle_Down","Rick_Hands_Middle_Base","Rick_Hands_Middle_Left","Rick_Hands_Middle_Right","Rick_Hands_Middle2_Down","Rick_Hands_Middle2_Base","Rick_Hands_Middle2_Left","Rick_Hands_Middle2_Right","Rick_Weeding_Stop_Down","Rick_Weeding_Stop_Base","Rick_Weeding_Stop_Left","Rick_Weeding_Stop_Right","Rick_Weeding_Walking_Down","Rick_Weeding_Walking_Base","Rick_Weeding_Walking_Left","Rick_Weeding_Walking_Right","Rick_Weeding_Kiss_1","Rick_Weeding_Kiss_2","Rick_Weeding_Kiss_3","Rick_Weeding_Kiss_4","Popuri_Stop_Down","Popuri_Stop_Base","Popuri_Stop_Left","Popuri_Stop_Right","Popuri_Walking_Down","Popuri_Walking_Base","Popuri_Walking_Left","Popuri_Walking_Right","Popuri_Hands_Middle_Down","Popuri_Hands_Middle_Base","Popuri_Hands_Middle_Left","Popuri_Hands_Middle_Right","Popuri_Hands_Middle2_Down","Popuri_Hands_Middle2_Base","Popuri_Hands_Middle2_Left","Popuri_Hands_Middle2_Right","Shadwo_Anim_5","Shadwo_Anim_6","Shadwo_Anim_7","Shadwo_Anim_8","Shadwo_AnimB_5","Shadwo_AnimB_6","Shadwo_AnimB_7","Shadwo_AnimB_8","Popuri_Child_Stop_Down","Popuri_Child_Stop_Base","Popuri_Child_Stop_Left","Popuri_Child_Stop_Right","Popuri_Child_Walking_Down","Popuri_Child_Walking_Base","Popuri_Child_Walking_Left","Popuri_Child_Walking_Right","Popuri_Weeding_Stop_Down","Popuri_Weeding_Stop_Base","Popuri_Weeding_Stop_Left","Popuri_Weeding_Stop_Right","Popuri_Weeding_Walking_Down","Popuri_Weeding_Walking_Base","Popuri_Weeding_Walking_Left","Popuri_Weeding_Walking_Right","Popuri_Weeding_Kiss_1","Popuri_Weeding_Kiss_2","Popuri_Weeding_Kiss_3","Popuri_Weeding_Kiss_4","Shadwo_AnimB_9","Shadwo_AnimB_10","Shadwo_AnimB_11","Shadwo_AnimB_12","Lilia_Stop_Down","Lilia_Stop_Base","Lilia_Stop_Left","Lilia_Stop_Right","Lilia_Walking_Down","Lilia_Walking_Base","Lilia_Walking_Left","Lilia_Walking_Right","Baby_Stop_Down","Baby_Stop_Base","Baby_Stop_Left","Baby_Stop_Right","Baby_Sit_Down","Baby_Sit_Base","Baby_Sit_Left","Baby_Sit_Right","Baby_Walking_Down","Baby_Walking_Base","Baby_Walking_Left","Baby_Walking_Right","Baby_Crawling_Down","Baby_Crawling_Base","Baby_Crawling_Left","Baby_Crawling_Right","Shadwo_AnimB_13","Shadwo_AnimB_14","Shadwo_AnimB_15","Shadwo_AnimB_16","Clif_Stop_Down","Clif_Stop_Base","Clif_Stop_Left","Clif_Stop_Right","Clif_Walking_Down","Clif_Walking_Base","Clif_Walking_Left","Clif_Walking_Right","Clif_Hands_Middle_1_Down","Clif_Hands_Middle_1_Base","Clif_Hands_Middle_1_Left","Clif_Hands_Middle_1_Right","Clif_Weeding_Stop_Down","Clif_Weeding_Stop_Base","Clif_Weeding_Stop_Left","Clif_Weeding_Stop_Right","Cliff_Weeding_Walking_Down","Cliff_Weeding_Walking_Base","Cliff_Weeding_Walking_Left","Cliff_Weeding_Walking_Right","Cliff_Weeding_Kiss_1","Cliff_Weeding_Kiss_2","Cliff_Weeding_Kiss_3","Cliff_Weeding_Kiss_4","Shadwo_AnimB_17","Shadwo_AnimB_18","Shadwo_AnimB_19","Shadwo_AnimB_20","Shadwo_AnimC_1","Shadwo_AnimC_2","Shadwo_AnimC_3","Shadwo_AnimC_4","Clif_Faint_1","Clif_Faint_2","Clif_Faint_3","Clif_Faint_4","Shadwo_AnimC_5","Shadwo_AnimC_6","Shadwo_AnimC_7","Shadwo_AnimC_8","Cicada_Flashing_1","Cicada_Flashing_2","Cicada_Flashing_3","Cicada_Flashing_4","Cicada_Fliying_1","Cicada_Fliying_2","Cicada_Fliying_3","Cicada_Fliying_4","Cicada_Stop","Cow1_Stop_Down","Cow1_Stop_Base","Cow1_Stop_Left","Cow1_Stop_Right","Cow1_Walking_Down","Cow1_Walking_Base","Cow1_Walking_Left","Cow1_Walking_Right","Cow1_Eating_Down","Cow1_Eating_Base","Cow1_Eating_Left","Cow1_Eating_Right","Cow1_Sleep_Down","Cow1_Sleep_Base","Cow1_Sleep_Left","Cow1_Sleep_Right","Cow1_Deep_Sleep_Down","Cow1_Deep_Sleep_Base","Cow1_Deep_Sleep_Left","Cow1_Deep_Sleep_Right","Cow1_Happy_Down","Cow1_Happy_Base","Cow1_Happy_Left","Cow1_Happy_Right","Cow2_Stop_Down","Cow2_Stop_Base","Cow2_Stop_Left","Cow2_Stop_Right","","","","","Cow2_Walking_Down","Cow2_Walking_Base","Cow2_Walking_Left","Cow2_Walking_Right","Cow2_Eating_Down","Cow2_Eating_Base","Cow2_Eating_Left","Cow2_Eating_Right","Cow2_Sleep_Down","Cow2_Sleep_Base","Cow2_Sleep_Left","Cow2_Sleep_Right","Cow2_Deep_Sleep_Down","Cow2_Deep_Sleep_Base","Cow2_Deep_Sleep_Left","Cow2_Deep_Sleep_Right","Cow2_Happy_Down","Cow2_Happy_Base","Cow2_Happy_Left","Cow2_Happy_Right","Cow3_Stop_Down","Cow3_Stop_Base","Cow3_Stop_Left","Cow3_Stop_Right","Cow3_Walking_Down","Cow3_Walking_Base","Cow3_Walking_Left","Cow3_Walking_Right","Cow3_Eating_Down","Cow3_Eating_Base","Cow3_Eating_Left","Cow3_Eating_Right","Cow3_Sleep_Down","Cow3_Sleep_Base","Cow3_Sleep_Left","Cow3_Sleep_Right","Cow3_Deep_Sleep_Down","Cow3_Deep_Sleep_Base","Cow3_Deep_Sleep_Left","Cow3_Deep_Sleep_Right","Cow3_Happy_Down","Cow3_Happy_Base","Cow3_Happy_Left","Cow3_Happy_Right","Coww_Happy?_Down","Coww_Happy?_Base","Coww_Happy?_Left","Coww_Happy?_Right","Cow_Baby_Stop_Down","Cow_Baby_Stop_Base","Cow_Baby_Stop_Left","Cow_Baby_Stop_Right","Cow_Baby_Walking_Down","Cow_Baby_Walking_Base","Cow_Baby_Walking_Left","Cow_Baby_Walking_Right","Cow_Baby_Eating_Down","Cow_Baby_Eating_Base","Cow_Baby_Eating_Left","Cow_Baby_Eating_Right","Cow_Baby_Sleep_Down","Cow_Baby_Sleep_Base","Cow_Baby_Sleep_Left","Cow_Baby_Sleep_Right","Cow_Baby_Deep_Sleep_Down","Cow_Baby_Deep_Sleep_Base","Cow_Baby_Deep_Sleep_Left","Cow_Baby_Deep_Sleep_Right","Cow_Baby_Happy_Down","Cow_Baby_Happy_Base","Cow_Baby_Happy_Left","Cow_Baby_Happy_Right","Cow_Baby_Happy_Down2","Cow_Baby_Happy_Up2","Cow_Baby_Happy_Left2","Cow_Baby_Happy_Right2","Zack_Stop_Down","Zack_Stop_Base","Zack_Stop_Left","Zack_Stop_Right","Zack_Walking_Down","Zack_Walking_Base","Zack_Walking_Left","Doctor_Stop_Down","Doctor_Stop_Base","Doctor_Stop_Left","Doctor_Stop_Right","Doctor_Walking_Down","Doctor_Walking_Base","Doctor_Walking_Left","Doctor_Walking_Right","Doctor_Hands_Middle_1_Down","Doctor_Hands_Middle_1_Base","Doctor_Hands_Middle_1_Left","Doctor_Hands_Middle_1_Right","Doctor_Weeding_Stop_Down","Doctor_Weeding_Stop_Base","Doctor_Weeding_Stop_Left","Doctor_Weeding_Stop_Right","Doctor_Weeding_Walking_Down","Doctor_Weeding_Walking_Base","Doctor_Weeding_Walking_Left","Doctor_Weeding_Walking_Right","Doctor_Weeding_Kiss_1","Doctor_Weeding_Kiss_2","Doctor_Weeding_Kiss_3","Doctor_Weeding_Kiss_4","Dog_Stop_Down","Dog_Stop_Base","Dog_Stop_Left","Dog_Stop_Right","Dog_Walking_Down","Dog_Walking_Base","Dog_Walking_Left","Dog_Walking_Right","Dog_Running_Down","Dog_Running_Base","Dog_Running_Left","Dog_Running_Right","Dog_Eating_Down","Dog_Eating_Base","Dog_Eating_Left","Dog_Eating_Right","Dog_Stop_Happy_Down","Dog_Stop_Happy_Base","Dog_Stop_Happy_Left","Dog_Stop_Happy_Right","Dog_Sitting_Down","Dog_Sitting_Base","Dog_Sitting_Left","Dog_Sitting_Right","Dog_Scratching_Down","Dog_Scratching_Base","Dog_Scratching_Left","Dog_Scratching_Right","Dog_Sleeping_Down","Dog_Sleeping_Base","Dog_Sleeping_Left","Dog_Sleeping_Right","Dog_Deep_Sleeping_Down","Dog_Deep_Sleeping_Base","Dog_Deep_Sleeping_Left","Dog_Deep_Sleeping_Right","Dog_Side_Belly_Down","Dog_Side_Belly_Base","Dog_Side_Belly_Left","Dog_Side_Belly_Right","Dog_Belly_Up_1","Dog_Belly_Up_2","Dog_Belly_Up_3","Dog_Belly_Up_4","Dog_Jump1_Down","Dog_Jump1_Base","Dog_Jump1_Left","Dog_Jump1_Right","Dog_Jump2_Down","Dog_Jump2_Base","Dog_Jump2_Left","Dog_Jump2_Right","Dog_Jump3_Down","Dog_Jump3_Base","Dog_Jump3_Left","Dog_Jump3_Right","Dog_Barking_Down","Dog_Barking_Base","Dog_Barking_Left","Dog_Barking_Right","Dog_Left_Sit","Dog_Jumping_Happy_Down","Dog_Jumping_Happy_Base","Dog_Jumping_Happy_Left","Dog_Jumping_Happy_Right","Other_Dog_1_Stop_Down","Other_Dog_1_Stop_Base","Other_Dog_1_Stop_Left","Other_Dog_1_Stop_Right","Other_Dog_1_Walking_Down","Other_Dog_1_Walking_Base","Other_Dog_1_Walking_Left","Other_Dog_1_Walking_Right","Other_Dog_1_Running_Down","Other_Dog_1_Running_Base","Other_Dog_1_Running_Left","Other_Dog_1_Running_Right","Other_Dog_1_Eating_Down","Other_Dog_1_Eating_Base","Other_Dog_1_Eating_Left","Other_Dog_1_Eating_Right","Other_Dog_1_Happy_Down","Other_Dog_1_Happy_Base","Other_Dog_1_Happy_Left","Other_Dog_1_Happy_Right","Other_Dog_1_Sit_Down","Other_Dog_1_Sit_Base","Other_Dog_1_Sit_Left","Other_Dog_1_Sit_Right","Other_Dog_1_Scratching_Down","Other_Dog_1_Scratching_Base","Other_Dog_1_Scratching_Left","Other_Dog_1_Scratching_Right","Other_Dog_1_Sleeping_Down","Other_Dog_1_Sleeping_Base","Other_Dog_1_Sleeping_Left","Other_Dog_1_Sleeping_Right","Other_Dog_1_Deep_Sleeping_Down","Other_Dog_1_Deep_Sleeping_Base","Other_Dog_1_Deep_Sleeping_Left","Other_Dog_1_Deep_Sleeping_Right","Other_Dog_1_Belly_Down","Other_Dog_1_Belly_Base","Other_Dog_1_Belly_Left","Other_Dog_1_Belly_Right","Other_Dog_1_Belly_Up_Down","Other_Dog_1_Belly_Up_Base","Other_Dog_1_Belly_Up_Left","Other_Dog_1_Belly_Up_Right","Other_Dog_1_Barking_Down","Other_Dog_1_Barking_Base","Other_Dog_1_Barking_Left","Other_Dog_1_Barking_Right","Other_Dog_1_Sit","Other_Dog_1_Happy_Jumping_Down","Other_Dog_1_Happy_Jumping_Base","Other_Dog_1_Happy_Jumping_Left","Other_Dog_1_Happy_Jumping_Right","Baby_Dog_Stop_Down","Baby_Dog_Stop_Base","Baby_Dog_Stop_Left","Baby_Dog_Stop_Right","Baby_Dog_Running_Down","Baby_Dog_Running_Base","Baby_Dog_Running_Left","Baby_Dog_Running_Right","Baby_Dog_Walking_Down","Baby_Dog_Walking_Base","Baby_Dog_Walking_Left","Baby_Dog_Walking_Right","Baby_Dog_Eating_Down","Baby_Dog_Eating_Base","Baby_Dog_Eating_Left","Baby_Dog_Eating_Right","Baby_Dog_Happy_Down","Baby_Dog_Happy_Base","Baby_Dog_Happy_Left","Baby_Dog_Happy_Right","Baby_Dog_Sit_Down","Baby_Dog_Sit_Base","Baby_Dog_Sit_Left","Baby_Dog_Sit_Right","Baby_Dog_Scratching_Down","Baby_Dog_Scratching_Base","Baby_Dog_Scratching_Left","Baby_Dog_Scratching_Right","Baby_Dog_Sleeping_Down","Baby_Dog_Sleeping_Base","Baby_Dog_Sleeping_Left","Baby_Dog_Sleeping_Right","Baby_Dog_Deep_Sleeping_Down","Baby_Dog_Deep_Sleeping_Base","Baby_Dog_Deep_Sleeping_Left","Baby_Dog_Deep_Sleeping_Right","Baby_Dog_Belly_Down","Baby_Dog_Belly_Base","Baby_Dog_Belly_Left","Baby_Dog_Belly_Right","Baby_Dog_Belly_Up_Down","Baby_Dog_Belly_Up_Base","Baby_Dog_Belly_Up_Left","Baby_Dog_Belly_Up_Right","Baby_Dog_Barking_Down","Baby_Dog_Barking_Base","Baby_Dog_Barking_Left","Baby_Dog_Barking_Right","Baby_Dog_Sit","Dragon_Fly_Down","Dragon_Fly_Base","Dragon_Fly_Left","Dragon_Fly_Right","Dragon_Fly_Stop","Staid_Stop_Down","Staid_Stop_Base","Staid_Stop_Left","Staid_Stop_Right","Staid_Walking_Down","Staid_Walking_Base","Staid_Walking_Left","Staid_Walking_Right","Staid_Sleeping_Down","Staid_Sleeping_Base","Staid_Sleeping_Left","Staid_Sleeping_Right","Staid_Singing_Down","Staid_Singing_Base","Staid_Singing_Left","Staid_Singing_Right","Staid_Stop_Down","Staid_Stop_Base","Staid_Stop_Left","Staid_Stop_Right","Staid_Crop_Lift_1_Down","Staid_Crop_Lift_1_Base","Staid_Crop_Lift_1_Left","Staid_Crop_Lift_1_Right","Staid_Crop_Lift_2_Down","Staid_Crop_Lift_2_Base","Staid_Crop_Lift_2_Left","Staid_Crop_Lift_2_Right","Staid_Crop_Lift_3_Down","Staid_Crop_Lift_3_Base","Staid_Crop_Lift_3_Left","Staid_Crop_Lift_3_Right","Staid_Crop_Lift_Mistake_Down","Staid_Crop_Lift_Mistake_Base","Staid_Crop_Lift_Mistake_Left","Staid_Crop_Lift_Mistake_Right","Staid_Crop_Lift_Broken_Mistake_Down","Staid_Crop_Lift_Broken_Mistake_Base","Staid_Crop_Lift_Broken_Mistake_Left","Staid_Crop_Lift_Broken_Mistake_Right","Staid_Crop_Pull_Overload_Down","Staid_Crop_Pull_Overload_Base","Staid_Crop_Pull_Overload_Left","Staid_Crop_Pull_Overload_Right","Staid_Crop_Pull_Stuck_Down","Staid_Crop_Pull_Stuck_Base","Staid_Crop_Pull_Stuck_Left","Staid_Crop_Pull_Stuck_Right","Staid_Crop_Pull1_Down","Staid_Crop_Pull1_Base","Staid_Crop_Pull1_Left","Staid_Crop_Pull1_Right","Staid_Crop_Pull1_Stuck_Down","Staid_Crop_Pull1_Stuck_Base","Staid_Crop_Pull1_Stuck_Left","Staid_Crop_Pull1_Stuck_Right","Staid_Crop_Pull2_Down","Staid_Crop_Pull2_Base","Staid_Crop_Pull2_Left","Staid_Crop_Pull2_Right","Staid_Crop_Pull2_Stuck_Down","Staid_Move_Animal_Feed_Down","Staid_Move_Animal_Feed_Base","Staid_Move_Animal_Feed_Left","Staid_Move_Animal_Feed_Right","Staid_Use_Animal_Feed_1","Staid_Use_Animal_Feed_2","Staid_Use_Animal_Feed_3","Staid_Use_Animal_Feed_4","Staid_Stop2_Down","Staid_Stop2_Base","Staid_Stop2_Left","Staid_Stop2_Right","Staid_Magic_Effect1","Staid_Magic_Effect2","Staid_Magic_Effect3","Staid_Magic_Effect4","Shadow_Animan1","Shadow_Animan2","Shadow_Animan3","Shadow_Animan4","Timid_Stop_Down","Timid_Stop_Base","Timid_Stop_Left","Timid_Stop_Right","Timid_Walking_Down","Timid_Walking_Base","Timid_Walking_Left","Timid_Walking_Right","Timid_Sleeping_Down","Timid_Sleeping_Base","Timid_Sleeping_Left","Timid_Sleeping_Right","Timid_Singing_Down","Timid_Singing_Base","Timid_Singing_Left","Timid_Singing_Right","Timid_Stop_Down","Timid_Stop_Base","Timid_Stop_Left","Timid_Stop_Right","Timid_Crop_Lift_1_Down","Timid_Crop_Lift_1_Base","Timid_Crop_Lift_1_Left","Timid_Crop_Lift_1_Right","Timid_Crop_Lift_2_Down","Timid_Crop_Lift_2_Base","Timid_Crop_Lift_2_Left","Timid_Crop_Lift_2_Right","Timid_Crop_Lift_3_Down","Timid_Crop_Lift_3_Base","Timid_Crop_Lift_3_Left","Timid_Crop_Lift_3_Right","Timid_Crop_Lift_Mistake_Down","Timid_Crop_Lift_Mistake_Base","Timid_Crop_Lift_Mistake_Left","Timid_Crop_Lift_Mistake_Right","Timid_Crop_Lift_Broken_Mistake_Down","Timid_Crop_Lift_Broken_Mistake_Base","Timid_Crop_Lift_Broken_Mistake_Left","Timid_Crop_Lift_Broken_Mistake_Right","Timid_Crop_Pull_Overload_Down","Timid_Crop_Pull_Overload_Base","Timid_Crop_Pull_Overload_Left","Timid_Crop_Pull_Overload_Right","Timid_Crop_Pull_Stuck_Down","Timid_Crop_Pull_Stuck_Base","Timid_Crop_Pull_Stuck_Left","Timid_Crop_Pull_Stuck_Right","Timid_Crop_Pull1_Down","Timid_Crop_Pull1_Base","Timid_Crop_Pull1_Left","Timid_Crop_Pull1_Right","Timid_Crop_Pull1_Stuck_Down","Timid_Crop_Pull1_Stuck_Base","Timid_Crop_Pull1_Stuck_Left","Timid_Crop_Pull1_Stuck_Right","Timid_Crop_Pull2_Down","Timid_Crop_Pull2_Base","Timid_Crop_Pull2_Left","Timid_Crop_Pull2_Right","Timid_Crop_Pull2_Stuck_Down","Timid_Move_Animal_Feed_Down","Timid_Move_Animal_Feed_Base","Timid_Move_Animal_Feed_Left","Timid_Move_Animal_Feed_Right","Timid_Use_Animal_Feed_1","Timid_Use_Animal_Feed_2","Timid_Use_Animal_Feed_3","Timid_Use_Animal_Feed_4","Timid_Stop2_Down","Timid_Stop2_Base","Timid_Stop2_Left","Timid_Stop2_Right","timid_Stop_3","timid_Stop_4","Timid_Stop5","Timid_Magic_Effect1","Timid_Magic_Effect2","Timid_Magic_Effect3","Timid_Magic_Effect4","Shadow_Animan1","Shadow_Animan2","Shadow_Animan3","Shadow_Animan4","Nappy_Stop_Down","Nappy_Stop_Base","Nappy_Stop_Left","Nappy_Stop_Right","Nappy_Walking_Down","Nappy_Walking_Base","Nappy_Walking_Left","Nappy_Walking_Right","Nappy_Sleeping_Down","Nappy_Sleeping_Base","Nappy_Sleeping_Left","Nappy_Sleeping_Right","Nappy_Singing_Down","Nappy_Singing_Base","Nappy_Singing_Left","Nappy_Singing_Right","Nappy_Stop_Down","Nappy_Stop_Base","Nappy_Stop_Left","Nappy_Stop_Right","Nappy_Crop_Lift_1_Down","Nappy_Crop_Lift_1_Base","Nappy_Crop_Lift_1_Left","Nappy_Crop_Lift_1_Right","Nappy_Crop_Lift_2_Down","Nappy_Crop_Lift_2_Base","Nappy_Crop_Lift_2_Left","Nappy_Crop_Lift_2_Right","Nappy_Crop_Lift_3_Down","Nappy_Crop_Lift_3_Base","Nappy_Crop_Lift_3_Left","Nappy_Crop_Lift_3_Right","Nappy_Crop_Lift_Mistake_Down","Nappy_Crop_Lift_Mistake_Base","Nappy_Crop_Lift_Mistake_Left","Nappy_Crop_Lift_Mistake_Right","Nappy_Crop_Lift_Broken_Mistake_Down","Nappy_Crop_Lift_Broken_Mistake_Base","Nappy_Crop_Lift_Broken_Mistake_Left","Nappy_Crop_Lift_Broken_Mistake_Right","Nappy_Crop_Pull_Overload_Down","Nappy_Crop_Pull_Overload_Base","Nappy_Crop_Pull_Overload_Left","Nappy_Crop_Pull_Overload_Right","Nappy_Crop_Pull_Stuck_Down","Nappy_Crop_Pull_Stuck_Base","Nappy_Crop_Pull_Stuck_Left","Nappy_Crop_Pull_Stuck_Right","Nappy_Crop_Pull1_Down","Nappy_Crop_Pull1_Base","Nappy_Crop_Pull1_Left","Nappy_Crop_Pull1_Right","Nappy_Crop_Pull1_Stuck_Down","Nappy_Crop_Pull1_Stuck_Base","Nappy_Crop_Pull1_Stuck_Left","Nappy_Crop_Pull1_Stuck_Right","Nappy_Crop_Pull2_Down","Nappy_Crop_Pull2_Base","Nappy_Crop_Pull2_Left","Nappy_Crop_Pull2_Right","Nappy_Crop_Pull2_Stuck_Down","Nappy_Move_Animal_Feed_Down","Nappy_Move_Animal_Feed_Base","Nappy_Move_Animal_Feed_Left","Nappy_Move_Animal_Feed_Right","Nappy_Use_Animal_Feed_1","Nappy_Use_Animal_Feed_2","Nappy_Use_Animal_Feed_3","Nappy_Use_Animal_Feed_4","Nappy_Stop2_Down","Nappy_Stop2_Base","Nappy_Stop2_Left","Nappy_Stop2_Right","Nappy_Stop_3","Nappy_Stop_4","Nappy_Stop_5","Nappy_Magic_Effect1","Nappy_Magic_Effect2","Nappy_Magic_Effect3","Nappy_Magic_Effect4","Shadow_Animan1","Shadow_Animan2","Shadow_Animan3","Shadow_Animan4","Bold_Stop_Down","Bold_Stop_Base","Bold_Stop_Left","Bold_Stop_Right","Bold_Walking_Down","Bold_Walking_Base","Bold_Walking_Left","Bold_Walking_Right","Bold_Sleeping_Down","Bold_Sleeping_Base","Bold_Sleeping_Left","Bold_Sleeping_Right","Bold_Singing_Down","Bold_Singing_Base","Bold_Singing_Left","Bold_Singing_Right","Bold_Stop_Down","Bold_Stop_Base","Bold_Stop_Left","Bold_Stop_Right","Bold_Crop_Lift_1_Down","Bold_Crop_Lift_1_Base","Bold_Crop_Lift_1_Left","Bold_Crop_Lift_1_Right","Bold_Crop_Lift_2_Down","Bold_Crop_Lift_2_Base","Bold_Crop_Lift_2_Left","Bold_Crop_Lift_2_Right","Bold_Crop_Lift_3_Down","Bold_Crop_Lift_3_Base","Bold_Crop_Lift_3_Left","Bold_Crop_Lift_3_Right","Bold_Crop_Lift_Mistake_Down","Bold_Crop_Lift_Mistake_Base","Bold_Crop_Lift_Mistake_Left","Bold_Crop_Lift_Mistake_Right","Bold_Crop_Lift_Broken_Mistake_Down","Bold_Crop_Lift_Broken_Mistake_Base","Bold_Crop_Lift_Broken_Mistake_Left","Bold_Crop_Lift_Broken_Mistake_Right","Bold_Crop_Pull_Overload_Down","Bold_Crop_Pull_Overload_Base","Bold_Crop_Pull_Stuck_Down","Bold_Crop_Pull_Stuck_Base","Bold_Crop_Pull_Stuck_Left","Bold_Crop_Pull_Stuck_Right","Bold_Crop_Pull1_Down","Bold_Crop_Pull1_Base","Bold_Crop_Pull1_Left","Bold_Crop_Pull1_Right","Bold_Crop_Pull1_Stuck_Down","Bold_Crop_Pull1_Stuck_Base","Bold_Crop_Pull1_Stuck_Left","Bold_Crop_Pull1_Stuck_Right","Bold_Crop_Pull2_Down","Bold_Crop_Pull2_Base","Bold_Crop_Pull2_Left","Bold_Crop_Pull2_Right","Bold_Crop_Pull2_Stuck_Down","Bold_Crop_Pull2_Stuck_Base","Bold_Crop_Pull2_Stuck_Left","Bold_Crop_Pull2_Stuck_Right","Bold_Move_Animal_Feed_Down","Bold_Move_Animal_Feed_Base","Bold_Move_Animal_Feed_Left","Bold_Move_Animal_Feed_Right","Bold_Use_Animal_Feed_1","Bold_Use_Animal_Feed_2","Bold_Use_Animal_Feed_3","Bold_Use_Animal_Feed_4","Bold_Stop2_Down","Bold_Stop2_Base","Bold_Stop2_Left","Bold_Stop2_Right","Bold_Stop_3","Bold_Stop_4","Bold_Magic_Effect1","Bold_Magic_Effect2","Bold_Magic_Effect3","Bold_Magic_Effect4","Shadow_Animan1","Shadow_Animan2","Shadow_Animan3","Shadow_Animan4","Chef_Stop_Down","Chef_Stop_Base","Chef_Stop_Left","Chef_Stop_Right","Chef_Walking_Down","Chef_Walking_Base","Chef_Walking_Left","Chef_Walking_Right","Chef_Sleeping_Down","Chef_Sleeping_Base","Chef_Sleeping_Left","Chef_Sleeping_Right","Chef_Singing_Down","Chef_Singing_Base","Chef_Singing_Left","Chef_Singing_Right","Chef_Stop_Down","Chef_Stop_Base","Chef_Stop_Left","Chef_Stop_Right","Chef_Crop_Lift_1_Down","Chef_Crop_Lift_1_Base","Chef_Crop_Lift_1_Left","Chef_Crop_Lift_1_Right","Chef_Crop_Lift_2_Down","Chef_Crop_Lift_2_Base","Chef_Crop_Lift_2_Left","Chef_Crop_Lift_2_Right","Chef_Crop_Lift_3_Down","Chef_Crop_Lift_3_Base","Chef_Crop_Lift_3_Left","Chef_Crop_Lift_3_Right","Chef_Crop_Lift_Mistake_Down","Chef_Crop_Lift_Mistake_Base","Chef_Crop_Lift_Mistake_Left","Chef_Crop_Lift_Mistake_Right","Chef_Crop_Lift_Broken_Mistake_Down","Chef_Crop_Lift_Broken_Mistake_Base","Chef_Crop_Lift_Broken_Mistake_Left","Chef_Crop_Lift_Broken_Mistake_Right","Chef_Crop_Pull_Overload_Down","Chef_Crop_Pull_Overload_Base","Chef_Crop_Pull_Overload_Left","Chef_Crop_Pull_Overload_Right","Chef_Crop_Pull_Stuck_Down","Chef_Crop_Pull_Stuck_Base","Chef_Crop_Pull_Stuck_Left","Chef_Crop_Pull_Stuck_Right","Chef_Crop_Pull1_Down","Chef_Crop_Pull1_Base","Chef_Crop_Pull1_Left","Chef_Crop_Pull1_Right","Chef_Crop_Pull1_Stuck_Down","Chef_Crop_Pull1_Stuck_Base","Chef_Crop_Pull1_Stuck_Left","Chef_Crop_Pull1_Stuck_Right","Chef_Crop_Pull2_Down","Chef_Crop_Pull2_Base","Chef_Crop_Pull2_Left","Chef_Crop_Pull2_Right","Chef_Crop_Pull2_Stuck_Down","Chef_Move_Animal_Feed_Down","Chef_Move_Animal_Feed_Base","Chef_Move_Animal_Feed_Left","Chef_Move_Animal_Feed_Right","Chef_Use_Animal_Feed_1","Chef_Use_Animal_Feed_2","Chef_Use_Animal_Feed_3","Chef_Use_Animal_Feed_4","Chef_Stop2_Down","Chef_Stop2_Base","Chef_Stop2_Left","Chef_Stop2_Right","Chef_Stop_3","Chef_Stop_4","Chef_Stop_5","Chef_Magic_Effect1","Chef_Magic_Effect2","Chef_Magic_Effect3","Chef_Magic_Effect4","Shadow_Animan1","Shadow_Animan2","Shadow_Animan3","Shadow_Animan4","Aqua_Stop_Down","Aqua_Stop_Base","Aqua_Stop_Left","Aqua_Stop_Right","Aqua_Walking_Down","Aqua_Walking_Base","Aqua_Walking_Left","Aqua_Walking_Right","Aqua_Sleeping_Down","Aqua_Sleeping_Base","Aqua_Sleeping_Left","Aqua_Sleeping_Right","Aqua_Singing_Down","Aqua_Singing_Base","Aqua_Singing_Left","Aqua_Singing_Right","Aqua_Stop2_Down","Aqua_Stop_Base","Aqua_Stop_Left","Aqua_Stop_Right","Aqua_Crop_Lift_1_Down","Aqua_Crop_Lift_1_Base","Aqua_Crop_Lift_1_Left","Aqua_Crop_Lift_1_Right","Aqua_Crop_Lift_2_Down","Aqua_Crop_Lift_2_Base","Aqua_Crop_Lift_2_Left","Aqua_Crop_Lift_2_Right","Aqua_Crop_Lift_3_Down","Aqua_Crop_Lift_3_Base","Aqua_Crop_Lift_3_Left","Aqua_Crop_Lift_3_Right","Aqua_Crop_Lift_Mistake_Down","Aqua_Crop_Lift_Mistake_Base","Aqua_Crop_Lift_Mistake_Left","Aqua_Crop_Lift_Mistake_Right","Aqua_Crop_Lift_Broken_Mistake_Down","Aqua_Crop_Lift_Broken_Mistake_Base","Aqua_Crop_Lift_Broken_Mistake_Left","Aqua_Crop_Lift_Broken_Mistake_Right","Aqua_Crop_Pull_Overload_Down","Aqua_Crop_Pull_Overload_Base","Aqua_Crop_Pull_Overload_Left","Aqua_Crop_Pull_Overload_Right","Aqua_Crop_Pull_Stuck_Down","Aqua_Crop_Pull_Stuck_Base","Aqua_Crop_Pull_Stuck_Left","Aqua_Crop_Pull_Stuck_Right","Aqua_Crop_Pull1_Down","Aqua_Crop_Pull1_Base","Aqua_Crop_Pull1_Left","Aqua_Crop_Pull1_Right","Aqua_Crop_Pull1_Stuck_Down","Aqua_Crop_Pull1_Stuck_Base","Aqua_Crop_Pull1_Stuck_Left","Aqua_Crop_Pull1_Stuck_Right","Aqua_Crop_Pull2_Down","Aqua_Crop_Pull2_Base","Aqua_Crop_Pull2_Left","Aqua_Crop_Pull2_Right","Aqua_Crop_Pull2_Stuck_Down","Aqua_Crop_Pull2_Stuck_Base","Aqua_Crop_Pull2_Stuck_Left","Aqua_Crop_Pull2_Stuck_Right","Aqua_Move_Animal_Feed_Down","Aqua_Move_Animal_Feed_Base","Aqua_Move_Animal_Feed_Left","Aqua_Move_Animal_Feed_Right","Aqua_Use_Animal_Feed_1","Aqua_Use_Animal_Feed_2","Aqua_Use_Animal_Feed_3","Aqua_Use_Animal_Feed_4","Aqua_Stop2_Down","Aqua_Stop2_Base","Aqua_Stop2_Left","Aqua_Stop2_Right","Aqua_Magic_Effect1","Aqua_Magic_Effect2","Aqua_Magic_Effect3","Aqua_Magic_Effect4","Shadow_Animan1","Shadow_Animan2","Shadow_Animan3","Shadow_Animan4","Hoggy_Stop_Down","Hoggy_Stop_Base","Hoggy_Stop_Left","Hoggy_Stop_Right","Hoggy_Walking_Down","Hoggy_Walking_Base","Hoggy_Walking_Left","Hoggy_Walking_Right","Hoggy_Sleeping_Down","Hoggy_Sleeping_Base","Hoggy_Sleeping_Left","Hoggy_Sleeping_Right","Hoggy_Singing_Down","Hoggy_Singing_Base","Hoggy_Singing_Left","Hoggy_Singing_Right","Hoggy_Stop2_Down","Hoggy_Stop2_Base","Hoggy_Stop2_Left","Hoggy_Stop2_Right","Hoggy_Crop_Lift_1_Down","Hoggy_Crop_Lift_1_Base","Hoggy_Crop_Lift_1_Left","Hoggy_Crop_Lift_1_Right","Hoggy_Crop_Lift_2_Down","Hoggy_Crop_Lift_2_Base","","Hoggy_Crop_Lift_2_Right","Hoggy_Crop_Lift_3_Down","Hoggy_Crop_Lift_3_Base","Hoggy_Crop_Lift_3_Left","Hoggy_Crop_Lift_3_Right","Hoggy_Crop_Lift_Mistake_Down","Hoggy_Crop_Lift_Mistake_Base","Hoggy_Crop_Lift_Mistake_Left","Hoggy_Crop_Lift_Mistake_Right","Hoggy_Crop_Lift_Broken_Mistake_Down","Hoggy_Crop_Lift_Broken_Mistake_Base","Hoggy_Crop_Lift_Broken_Mistake_Left","Hoggy_Crop_Lift_Broken_Mistake_Right","Hoggy_Crop_Pull_Overload_Down","Hoggy_Crop_Pull_Overload_Base","Hoggy_Crop_Pull_Overload_Left","Hoggy_Crop_Pull_Overload_Right","Hoggy_Crop_Pull_Stuck_Down","Hoggy_Crop_Pull_Stuck_Base","Hoggy_Crop_Pull_Stuck_Left","Hoggy_Crop_Pull_Stuck_Right","Hoggy_Crop_Pull1_Down","Hoggy_Crop_Pull1_Base","Hoggy_Crop_Pull1_Left","Hoggy_Crop_Pull1_Right","Hoggy_Crop_Pull1_Stuck_Down","Hoggy_Crop_Pull1_Stuck_Base","Hoggy_Crop_Pull1_Stuck_Left","Hoggy_Crop_Pull1_Stuck_Right","Hoggy_Crop_Pull2_Down","Hoggy_Crop_Pull2_Base","Hoggy_Crop_Pull2_Left","Hoggy_Crop_Pull2_Right","Hoggy_Crop_Pull2_Stuck_Down","Hoggy_Crop_Pull2_Stuck_Base","Hoggy_Crop_Pull2_Stuck_Left","Hoggy_Crop_Pull2_Stuck_Right","Hoggy_Move_Animal_Feed_Down","Hoggy_Move_Animal_Feed_Base","Hoggy_Move_Animal_Feed_Left","Hoggy_Move_Animal_Feed_Right","Hoggy_Use_Animal_Feed_1","Hoggy_Use_Animal_Feed_2","Hoggy_Use_Animal_Feed_3","Hoggy_Use_Animal_Feed_4","Hoggy_Stop2_Down","Hoggy_Stop2_Base","Hoggy_Stop2_Left","Hoggy_Stop2_Right","Hoggy_Magic_Effect1","Hoggy_Magic_Effect2","Hoggy_Magic_Effect3","Hoggy_Magic_Effect4","Shadow_Animan1","Shadow_Animan2","Shadow_Animan3","Shadow_Animan4","Chiken_Manager_1_Down","Chiken_Manager_1_Base","Chiken_Manager_1_Left","Chiken_Manager_1_Right","Chiken_Manager_1_Stop_Down","Chiken_Manager_1_Stop_Base","Chiken_Manager_1_Stop_Left","Chiken_Manager_1_Stop_Right","Padding_1","Padding_2","Padding_3","Padding_4","Chiken_Manager_2_Down","Chiken_Manager_2_Base","Chiken_Manager_2_Left","Chiken_Manager_2_Right","Chiken_Manager_2_Stop_Down","Chiken_Manager_2_Stop_Base","Chiken_Manager_3_Left","Chiken_Manager_3_Right","Chiken_Manager_3_Stop_Down","Chiken_Manager_3_Stop_Base","Chiken_Manager_3_Stop_Left","Chiken_Manager_3_Stop_Right","Padding_5","Padding_6","Padding_7","Padding_8","Cosa_Rara_Parpadeando_1","Cosa_Rara_Parpadeando_2","Cosa_Rara_Parpadeando_3","Cosa_Rara_Parpadeando_4","Cosa_Rara_Parpadeando_5","Cosa_Rara_Parpadeando_6","Cosa_Rara_Parpadeando_7","Cosa_Rara_Parpadeando_8","Cosa_Rara_Parpadeando_9","Cosa_Rara_Parpadeando_10","Cosa_Rara_Parpadeando_11","Cosa_Rara_Parpadeando_12","Cosa_Rara_Parpadeando_13","Cosa_Rara_Parpadeando_14","Cosa_Rara_Parpadeando_15","Cosa_Rara_Parpadeando_16","Other_Cat_Stop_Down","Other_Cat_Stop_Base","Other_Cat_Stop_Left","Other_Cat_Stop_Right","Other_Cat_Down","Other_Cat_Base","Other_Cat_Left","Other_Cat_Right","Cat_Stop_Stop","Frog_Stop_Down","Frog_Stop_Base","Frog_Stop_Left","Frog_Stop_Right","Frog_Walk_Down","Frog_Walk_Base","Frog_Walk_Left","Frog_Walk_Right","H.Goodes_Stop_Down","H.Goodes_Stop_Base","H.Goodes_Stop_Left","H.Goodes_Stop_Right","H.Goodes_Walk_Down","H.Goodes_Walk_Base","H.Goodes_Walk_Left","H.Goodes_Walk_Right","H.Goodes_Hands_Down","H.Goodes_Hands_Base","H.Goodes_Hands_Left","H.Goodes_Hands_Right","H.Goodes_Levitate_Down","H.Goodes_Levitate_Base","H.Goodes_Levitate_Left","H.Goodes_Levitate_Right","Gourmet_Stop_Down","Gourmet_Stop_Base","Gourmet_Stop_Left","Gourmet_Stop_Right","Gourmet_Walking_Down","Gourmet_Walking_Base","Gourmet_Walking_Left","Gourmet_Walking_Right","Gourmet_Eat_1","Gourmet_Eat_2","Gourmet_Eat_3","Gourmet_Eat_4","Ellen_Stop_Down","Ellen_Stop_Base","Ellen_Stop_Left","Ellen_Stop_Right","Jeff_Stop_Down","Jeff_Stop_Base","Jeff_Stop_Left","Jeff_Stop_Right","Jeff_Walk_Down","Jeff_Walk_Base","Jeff_Walk_Left","Jeff_Walk_Right","Karen_Stop_Down","Karen_Stop_Base","Karen_Stop_Left","Karen_Stop_Right","Karen_Walk_Down","Karen_Walk_Base","Karen_Walk_Left","Karen_Walk_Right","Karen_Middle_Hands_Down","Karen_Middle_Hands_Base","Karen_Middle_Hands_Left","Karen_Middle_Hands_Right","Karen_Stop2_Down","Karen_Stop2_Base","Karen_Stop2_Left","Karen_Stop2_Right","Paddign_9","Paddign_10","Paddign_11","Paddign_12","Padding_13","Padding_14","Padding_15","Padding_16","Karen_Sing_1","Karen_Sing_2","Karen_Sing_3","Karen_Sing_4","Karen_Baby_Stop_Down","Karen_Baby_Stop_Base","Karen_Baby_Stop_Left","Karen_Baby_Stop_Right","Karen_Baby_Walk_Down","Karen_Baby_Walk_Base","Karen_Baby_Walk_Left","Karen_Baby_Walk_Right","Karen_Weeding_Stop_Down","Karen_Weeding_Stop_Base","Karen_Weeding_Stop_Left","Karen_Weeding_Stop_Right","Karen_Weeding_Down","Karen_Weeding_Base","Karen_Weeding_Left","Karen_Weeding_Right","Karen_Weeding_Kiss_1","Karen_Weeding_Kiss_2","Karen_Weeding_Kiss_3","Karen_Weeding_Kiss_4","Padding_17","Padding_18","Padding_19","Padding_20","Sasha_Stop_Down","Sasha_Stop_Base","Sasha_Stop_Left","Sasha_Stop_Right","Sasha_Walk_Down","Sasha_Walk_Base","Sasha_Walk_Left","Sasha_Walk_Right","Sasha_Hands_Middle_Down","Sasha_Hands_Middle_Base","Sasha_Hands_Middle_Left","Sasha_Hands_Middle_Right","Black_Chiken_Stop_Down","Black_Chiken_Stop_Base","Black_Chiken_Stop_Left","Black_Chiken_Stop_Right","Black_Chiken_Down","Black_Chiken_Base","Black_Chiken_Left","Black_Chiken_Right","Black_Chiken_Eat_Down","Black_Chiken_Eat_Base","Black_Chiken_Eat_Left","Black_Chiken_Eat_Right","Black_Chiken_Exited_Down","Black_Chiken_Exited_Base","Black_Chiken_Exited_Left","Black_Chiken_Exited_Right","Black_Chiken_Sleep_Down","Black_Chiken_Sleep_Base","Black_Chiken_Sleep_Left","Black_Chiken_Sleep_Right","Black_Chiken_Super_Exited_Down","Black_Chiken_Super_Exited_Base","Black_Chiken_Super_Exited_Left","Black_Chiken_Super_Exited_Right","Black_Chiken_Sit","White_Chiken_Stop_Down","White_Chiken_Stop_Base","White_Chiken_Stop_Left","White_Chiken_Stop_Right","White_Chiken_Down","White_Chiken_Base","White_Chiken_Left","White_Chiken_Right","White_Chiken_Eat_Down","White_Chiken_Eat_Base","White_Chiken_Eat_Left","White_Chiken_Eat_Right","White_Chiken_Exited_Down","White_Chiken_Exited_Base","White_Chiken_Exited_Left","White_Chiken_Exited_Right","White_Chiken_Sleep_Down","White_Chiken_Sleep_Base","White_Chiken_Sleep_Left","White_Chiken_Sleep_Right","White_Chiken_Super_Exited_Down","White_Chiken_Super_Exited_Base","White_Chiken_Super_Exited_Left","White_Chiken_Super_Exited_Right","White_Chiken_Sit","Golden_Chiken_Stop_Down","Golden_Chiken_Stop_Base","Golden_Chiken_Stop_Left","Golden_Chiken_Stop_Right","Golden_Chiken_Down","Golden_Chiken_Base","Golden_Chiken_Left","Golden_Chiken_Right","Golden_Chiken_Eat_Down","Golden_Chiken_Eat_Base","Golden_Chiken_Eat_Left","Golden_Chiken_Eat_Right","Golden_Chiken_Exited_Down","Golden_Chiken_Exited_Base","Golden_Chiken_Exited_Left","Golden_Chiken_Exited_Right","Golden_Chiken_Sleep_Down","Golden_Chiken_Sleep_Base","Golden_Chiken_Sleep_Left","Golden_Chiken_Sleep_Right","Golden_Chiken_Super_Exited_Down","Golden_Chiken_Super_Exited_Base","Golden_Chiken_Super_Exited_Left","Golden_Chiken_Super_Exited_Right","Golden_Chiken_Sit","White2_Chiken_Stop_Down","White2_Chiken_Stop_Base","White2_Chiken_Stop_Left","White2_Chiken_Stop_Right","White2_Chiken_Down","White2_Chiken_Base","White2_Chiken_Left","White2_Chiken_Right","White2_Chiken_Eat_Down","White2_Chiken_Eat_Base","White2_Chiken_Eat_Left","White2_Chiken_Eat_Right","White2_Chiken_Exited_Down","White2_Chiken_Exited_Base","White2_Chiken_Exited_Left","White2_Chiken_Exited_Right","White2_Chiken_Sleep_Down","White2_Chiken_Sleep_Base","White2_Chiken_Sleep_Left","White2_Chiken_Sleep_Right","White2_Chiken_Sit","Baby_Chiken_Stop_Down","Baby_Chiken_Stop_Base","Baby_Chiken_Stop_Left","Baby_Chiken_Stop_Right","Baby_Chiken_Down","Baby_Chiken_Base","Baby_Chiken_Left","Baby_Chiken_Right","Baby_Chiken_Sit","Horse_Rider_1_Stop_Down","Horse_Rider_1_Stop_Base","Horse_Rider_1_Stop_Left","Horse_Rider_1_Stop_Right","Horse_Rider_1_Down","Horse_Rider_1_Base","Horse_Rider_1_Left","Horse_Rider_1_Right","Horse_Rider_1_Finish_Down","Horse_Rider_1_Finish_Base","Horse_Rider_1_Finish_Left","Horse_Rider_1_Finish_Right","Horse_Rider_2_Stop_Down","Horse_Rider_2_Stop_Base","Horse_Rider_2_Stop_Left","Horse_Rider_2_Stop_Right","Horse_Rider_2_Down","Horse_Rider_2_Base","Horse_Rider_2_Left","Horse_Rider_2_Right","Horse_Rider_2_Finish_Down","Horse_Rider_2_Finish_Base","Horse_Rider_2_Finish_Left","Horse_Rider_2_Finish_Right","Horse_Rider_3_Stop_Down","Horse_Rider_3_Stop_Base","Horse_Rider_3_Stop_Left","Horse_Rider_3_Stop_Right","Horse_Rider_3_Down","Horse_Rider_3_Base","Horse_Rider_3_Left","Horse_Rider_3_Right","Horse_Rider_3_Finish_Down","Horse_Rider_3_Finish_Base","Horse_Rider_3_Finish_Left","Horse_Rider_3_Finish_Right","Horse_Rider_4_Stop_Down","Horse_Rider_4_Stop_Base","Horse_Rider_4_Stop_Left","Horse_Rider_4_Stop_Right","Horse_Rider_4_Down","Horse_Rider_4_Base","Horse_Rider_4_Left","Horse_Rider_4_Right","Horse_Rider_4_Finish_Down","Horse_Rider_4_Finish_Base","Horse_Rider_4_Finish_Left","Horse_Rider_4_Finish_Right","Horse_Rider_5_Stop_Down","Horse_Rider_5_Stop_Base","Horse_Rider_5_Stop_Left","Horse_Rider_5_Stop_Right","Horse_Rider_5_Down","Horse_Rider_5_Base","Horse_Rider_5_Left","Horse_Rider_5_Right","Horse_Rider_5_Finish_Down","Horse_Rider_5_Finish_Base","Horse_Rider_5_Finish_Left","Horse_Rider_5_Finish_Right","Player_Horse_Rider_Stop_Down","Player_Horse_Rider_Stop_Base","Player_Horse_Rider_Stop_Left","Player_Horse_Rider_Stop_Right","Player_Horse_Rider_Down","Player_Horse_Rider_Base","Player_Horse_Rider_Left","Player_Horse_Rider_Right","Player_Horse_Rider_Finish_Down","Player_Horse_Rider_Finish_Base","Player_Horse_Rider_Finish_Left","Player_Horse_Rider_Finish_Right","Players_Horse_Stop_Down","Players_Horse_Stop_Base","Players_Horse_Stop_Left","Players_Horse_Stop_Right","Players_Horse_Down","Players_Horse_Base","Players_Horse_Left","Players_Horse_Right","Players_Horse_Faster_Down","Players_Horse_Faster_Base","Players_Horse_Faster_Left","Players_Horse_Faster_Right","Players_Horse_Eat_Down","Players_Horse_Eat_Base","Players_Horse_Eat_Left","Players_Horse_Eat_Right","Players_Horse_Sleeping_Down","Players_Horse_Sleeping_Base","Players_Horse_Sleeping_Left","Players_Horse_Sleeping_Right","Players_Horse_Deep_Sleep_Down","Players_Horse_Deep_Sleep_Base","Players_Horse_Deep_Sleep_Left","Players_Horse_Deep_Sleep_Right","Players_Horse_Super_Fast_Down","Players_Horse_Super_Fast_Base","Players_Horse_Super_Fast_Left","Players_Horse_Super_Fast_Right","Players_Horse_Happy_Down","Players_Horse_Happy_Base","Players_Horse_Happy_Left","Players_Horse_Happy_Right","Baby_Horse_Stop_Down","Baby_Horse_Stop_Base","Baby_Horse_Stop_Left","Baby_Horse_Stop_Right","Baby_Horse_Down","Baby_Horse_Base","Baby_Horse_Left","Baby_Horse_Right","Baby_Horse_Eat_Down","Baby_Horse_Eat_Base","Baby_Horse_Eat_Left","Baby_Horse_Eat_Right","Baby_Horse_Sleeping_Down","Baby_Horse_Sleeping_Base","Baby_Horse_Sleeping_Left","Baby_Horse_Sleeping_Right","Baby_Horse_Deep_Sleep_Down","Baby_Horse_Deep_Sleep_Base","Baby_Horse_Deep_Sleep_Left","Baby_Horse_Deep_Sleep_Right","Doug_Stop_Down","Doug_Stop_Base","Doug_Stop_Left","Doug_Stop_Right","Doug_Down","Doug_Base","Doug_Left","Doug_Right","Doug_Hands_Middle_Down","Doug_Hands_Middle_Base","Doug_Hands_Middle_Left","Doug_Hands_Middle_Right","Ann_Stop_Down","Ann_Stop_Base","Ann_Stop_Left","Ann_Stop_Right","Ann_Down","Ann_Base","Ann_Left","Ann_Right","Ann_Middle_Hands_Down","Ann_Middle_Hands_Base","Ann_Middle_Hands_Left","Ann_Middle_Hands_Right","Ann_Baby_Stop_Down","Ann_Baby_Stop_Base","Ann_Baby_Stop_Left","Ann_Baby_Stop_Right","Ann_Baby_Down","Ann_Baby_Base","Ann_Baby_Left","Ann_Baby_Right","Padding_1","Padding_2","Padding_3","Padding_4","Padding_5","Padding_6","Padding_7","Padding_8","Ann_Stop_1","Ann_Stop_2","Ann_Stop_3","Ann_Stop_4","Ann_Singing_1","Ann_Singing_2","Ann_Singing_3","Ann_Singing_4","Ann_Weeding_1","Ann_Weeding_2","Ann_Weeding_3","Ann_Weeding_4","Ann_Weeding_Kiss_1","Ann_Weeding_Kiss_2","Ann_Weeding_Kiss_3","Ann_Weeding_Kiss_4","Padding_9","Padding_10","Padding_11","Padding_12","Lu_Stop_Down","Lu_Stop_Base","Lu_Stop_Left","Lu_Stop_Right","Lu_Down","Lu_Base","Lu_Left","Lu_Right","Lu_Middle_Hands_Down","Lu_Middle_Hands_Base","Lu_Middle_Hands_Left","Lu_Middle_Hands_Right","Kappa_Stop_Down","Kappa_Stop_Base","Kappa_Stop_Left","Kappa_Stop_Right","Kappa_Middle_Hands_Down","Kappa_Middle_Hands_Base","Kappa_Middle_Hands_Left","Kappa_Middle_Hands_Right","Lady_Bug_Down","Lady_Bug_Base","Lady_Bug_Left","Lady_Bug_Right","Lady_Bug_Stop_1","Basil_Stop_Down","Basil_Stop_Base","Basil_Stop_Left","Basil_Stop_Right","Basil_Down","Basil_Base","Basil_Left","Basil_Right","Mary_Stop_1","Mary_Stop_2","Mary_Stop_3","Mary_Stop_4","Mary_Down","Mary_Base","Mary_Left","Mary_Right","Mary_Hands_Down","Mary_Hands_Base","Mary_Hands_Left","Mary_Hands_Right","Mary_Stop_1","Mary_Stop_2","Mary_Stop_3","Mary_Stop_4","Padding_13","Padding_14","Padding_15","Padding_16","Padding_17","Padding_18","Padding_19","Padding_20","Padding_21","","Padding_22","Padding_23","Mary_Baby_Stop_Down","Mary_Baby_Stop_Base","Mary_Baby_Stop_Left","Mary_Baby_Stop_Right","Mary_Baby_Down","Mary_Baby_Base","Mary_Baby_Left","Mary_Baby_Right","Mary_Weeding_Stop_Down","Mary_Weeding_Stop_Base","Mary_Weeding_Stop_Left","Mary_Weeding_Stop_Right","Mary_Weeding_Down","Mary_Weeding_Base","Mary_Weeding_Left","Mary_Weeding_Right","Mary_Weeding_Kiss_Down","Mary_Weeding_Kiss_Base","Mary_Weeding_Kiss_Left","Mary_Weeding_Kiss_Right","Padding_24","Padding_25","Padding_26","Padding_27","Padding_28","Padding_29","Padding_30","Padding_31","Anna_Stop_Down","Anna_Stop_Base","Anna_Stop_Left","Anna_Stop_Right","Anna_Down","Anna_Base","Anna_Left","Anna_Right","Anna_Hands_Down","Anna_Hands_Base","Anna_Hands_Left","Anna_Hands_Right","Won_Stop_Down","Won_Stop_Base","Won_Stop_Left","Won_Stop_Right","Won_Down","Won_Base","Won_Left","Won_Right","Thomas_Stop_Down","Thomas_Stop_Base","Thomas_Stop_Left","Thomas_Stop_Right","Thomas_Down","Thomas_Base","Thomas_Left","Thomas_Right","Thomas_Hands_Down","Thomas_Hands_Base","Thomas_Hands_Left","Thomas_Hands_Right","Mole_Stop_Down","Mole_Stop_Base","Mole_Stop_Left","Mole_Stop_Right","Mole_Down","Mole_Base","Mole_Left","Mole_Right","Mole2_Down","Mole2_Base","Mole2_Left","Mole2_Right","Monkey_Stop_Down","Monkey_Stop_Base","Monkey_Stop_Left","Monkey_Stop_Right","Monkey_Down","Monkey_Base","Monkey_Left","Monkey_Right","Monkey_Relax_Down","Monkey_Relax_Base","Monkey_Relax_Left","Monkey_Relax_Right","Monkey_Sellep","Elli_Stop_Down","Elli_Stop_Base","Elli_Stop_Left","Elli_Stop_Right","Elli_Down","Elli_Base","Elli_Left","Elli_Right","Elli_Hands_Down","Elli_Hands_Base","Elli_Hands_Left","Elli_Hands_Right","elli_Watching_1","elli_Watching_2","elli_Watching_3","elli_Watching_4","Elli_Baby_Stop_Down","Elli_Baby_Stop_Base","Elli_Baby_Stop_Left","Elli_Baby_Stop_Right","Elli_Baby_Down","Elli_Baby_Base","Elli_Baby_Left","Elli_Baby_Right","Padding_32","Padding_33","Padding_34","Padding_35","Padding_36","Padding_37","Padding_38","Padding_39","Elli_Singing_1","Elli_Singing_2","Elli_Singing_3","Elli_Singing_4","Elli_Weeding_Stop_Down","Elli_Weeding_Stop_Base","Elli_Weeding_Stop_Left","Elli_Weeding_Stop_Right","Elli_Weeding_Down","Elli_Weeding_Base","Elli_Weeding_Left","Elli_Weeding_Right","Elli_Weeding_Kiss_1","Elli_Weeding_Kiss_2","Elli_Weeding_Kiss_3","Elli_Weeding_Kiss_4","Padding_40","Padding_41","Padding_42","Padding_43","Stu_Stop_Down","Stu_Stop_Base","Stu_Stop_Left","Stu_Stop_Right","Stu_Down","Stu_Base","Stu_Left","Stu_Right","Duke_Stop_Down","Duke_Stop_Base","Duke_Stop_Left","Duke_Stop_Right","Duke_Down","Duke_Base","Duke_Left","Duke_Right","Duke_Colapsed_Down","Duke_Colapsed_Base","Duke_Colapsed_Left","Duke_Colapsed_Right","Duke_Hands_Down","Duke_Hands_Base","Duke_Hands_Left","Duke_Hands_Right","Manna_Stop_Down","Manna_Stop_Base","Manna_Stop_Left","Manna_Stop_Right","Manna_Down","Manna_Base","Manna_Left","Manna_Right","Lou_Stop_Down","Lou_Stop_Base","Lou_Stop_Left","Lou_Stop_Right","Lou_Down","Lou_Base","Lou_Left","Lou_Right","Lou_Hands_Down","Lou_Hands_Base","Lou_Hands_Left","Lou_Hands_Right","Harris_Stop_Down","Harris_Stop_Base","Harris_Stop_Left","Harris_Stop_Right","Harris_Down","Harris_Base","Harris_Left","Harris_Right","Carter_Stop_Down","Carter_Stop_Base","Carter_Stop_Left","Carter_Stop_Right","Carter_Down","Carter_Base","Carter_Left","Carter_Right","Rabbit_Down","Rabbit_Down_2","Rabbit_Base","Rabbit_Left","Rabbit_Right","Rabbit_Jump_Down","Rabbit_Jump_Base","Rabbit_Jump_Left","Rabbit_Jump_Right","Bug_Flye_1","Bug_Flye_2","Bug_Flye_3","Bug_Flye_4","Bug_Stop","Kai_Stop_Down","Kai_Stop_Base","Kai_Stop_Left","Kai_Stop_Right","Kai_Down","Kai_Base","Kai_Left","Kai_Right","Kai_Hands_Down","Kai_Hands_Base","Kai_Hands_Left","Kai_Hands_Right","Kai_Weedig_Stop_Down","Kai_Weedig_Stop_Base","Kai_Weedig_Stop_Left","Kai_Weedig_Stop_Right","Kai_Weedig_Down","Kai_Weedig_Base","Kai_Weedig_Left","Kai_Weedig_Right","Kai_Weedig_Kiss_Down","Kai_Weedig_Kiss_Base","Kai_Weedig_Kiss_Left","Kai_Weedig_Kiss_Right","Padding_44","Padding_45","Padding_46","Sheep_Stop_Down","Sheep_Stop_Base","Sheep_Stop_Left","Sheep_Stop_Right","Sheep_Down","Sheep_Base","Sheep_Left","Sheep_Right","Sheep_Eating_Down","Sheep_Eating_Base","Sheep_Eating_Left","Sheep_Eating_Right","Sheep_Sleeping_Down","Sheep_Sleeping_Base","Sheep_Sleeping_Left","Sheep_Sleeping_Right","Sheep_Deep_Sleeping_Down","Sheep_Deep_Sleeping_Base","Sheep_Deep_Sleeping_Left","Sheep_Deep_Sleeping_Right","Sheep_Happy_Down","Sheep_Happy_Base","Sheep_Happy_Left","Sheep_Happy_Right","Sheep_Normal_Down","Sheep_Normal_Base","Sheep_Normal_Left","Sheep_Normal_Right","Sheep_Sheared_Stop_Down","Sheep_Sheared_Stop_Base","Sheep_Sheared_Stop_Left","Sheep_Sheared_Stop_Right","Sheep_Sheared_Down","Sheep_Sheared_Base","Sheep_Sheared_Left","Sheep_Sheared_Right","Sheep_Sheared_Eating_Down","Sheep_Sheared_Eating_Base","Sheep_Sheared_Eating_Left","Sheep_Sheared_Eating_Right","Sheep_Sheared_Sleeping_Down","Sheep_Sheared_Sleeping_Base","Sheep_Sheared_Sleeping_Left","Sheep_Sheared_Sleeping_Right","Sheep_Sheared_Deep_Sleeping_Down","Sheep_Sheared_Deep_Sleeping_Base","Sheep_Sheared_Deep_Sleeping_Left","Sheep_Sheared_Deep_Sleeping_Right","Sheep_Sheared_Happy_Down","Sheep_Sheared_Happy_Base","Sheep_Sheared_Happy_Left","Sheep_Sheared_Happy_Right","Sheep_Sheared_Normal_Down","Sheep_Sheared_Normal_Base","Sheep_Sheared_Normal_Left","Sheep_Sheared_Normal_Right","Sheep_2_Stop_Down","Sheep_2_Stop_Base","Sheep_2_Stop_Left","Sheep_2_Stop_Right","","","","","Sheep_2_Eating_Down","Sheep_2_Eating_Base","Sheep_2_Eating_Left","Sheep_2_Eating_Right","Sheep_2_Sleeping_Down","Sheep_2_Sleeping_Base","Sheep_2_Sleeping_Left","Sheep_2_Sleeping_Right","Sheep_2_Deep_Sleeping_Down","Sheep_2_Deep_Sleeping_Base","Sheep__Deep_Sleeping_Left","Sheep_2_Deep_Sleeping_Right","Sheep_2_Happy_Down","Sheep_2_Happy_Base","Sheep_2_Happy_Left","Sheep_2_Happy_Right","","","","","Baby_Sheep_Down","Baby_Sheep_Base","Baby_Sheep_Left","Baby_Sheep_Right","Baby_Sheep_Eating_Down","Baby_Sheep_Eating_Base","Baby_Sheep_Eating_Left","Baby_Sheep_Eating_Right","Baby_Sheep_Sleeping_Down","Baby_Sheep_Sleeping_Base","Baby_Sheep_Sleeping_Left","Baby_Sheep_Sleeping_Right","Baby_Sheep_Stop_Down","Baby_Sheep_Stop_Base","Baby_Sheep_Stop_Left","Baby_Sheep_Stop_Right","Baby_Sheep_Deep_Sleeping_Down","Baby_Sheep_Deep_Sleeping_Base","Baby_Sheep_Deep_Sleeping_Left","Baby_Sheep_Deep_Sleeping_Right","Baby_Sheep_Happy_Down","Baby_Sheep_Happy_Base","Baby_Sheep_Happy_Left","Baby_Sheep_Happy_Right","Gray_Stop_Down","Gray_Stop_Base","Gray_Stop_Left","Gray_Stop_Right","Gray_Down","Gray_Base","Gray_Left","Gray_Right","Gray_Hands_Down","Gray_Hands_Base","Gray_Hands_Left","Gray_Hands_Right","Gray_Weeding_Stop_Down","Gray_Weeding_Stop_Base","Gray_Weeding_Stop_Left","Gray_Weeding_Stop_Right","Gray_Weeding_Down","Gray_Weeding_Base","Gray_Weeding_Left","Gray_Weeding_Right","Gray_Weeding_Kiss_1","Gray_Weeding_Kiss_2","Gray_Weeding_Kiss_3","Gray_Weeding_Kiss_4","Saibara_Stop_Down","Saibara_Stop_Base","Saibara_Stop_Left","Saibara_Stop_Right","Saibara_Down","Saibara_Base","Saibara_Left","Saibara_Right","Snake_Down","Snake_Base","Snake_Left","Snake_Right","Snake_Stop","Duck_Baby_Down","Duck_Baby_Base","Duck_Baby_Left","Duck_Baby_Right","Duck_Baby_Stop_Down","Duck_Baby_Stop_Base","Duck_Baby_Stop_Left","Duck_Baby_Stop_Right","Squirrel_Stop_Down","Squirrel_Stop_Base","Squirrel_Stop_Left","Squirrel_Stop_Right","Squirrel_Down","Squirrel_Base","Squirrel_Left","Squirrel_Right","Squirrel_Stop","Savagge_Dog_Stop_Down","Savagge_Dog_Stop_Base","Savagge_Dog_Stop_Left","Savagge_Dog_Stop_Right","Savagge_Dog_Down","Savagge_Dog_Base","Savagge_Dog_Left","Savagge_Dog_Right","Savagge_Dog_Runing_Down","Savagge_Dog_Runing_Base","Savagge_Dog_Runing_Left","Savagge_Dog_Runing_Right","Savagge_Dog_Barking_Down","Savagge_Dog_Barking_Base","Savagge_Dog_Barking_Left","Savagge_Dog_Barking_Right","Savage_Dog_Scared_Down","Savage_Dog_Scared_Base","Savage_Dog_Scared_Left","Savage_Dog_Scared_Right","Gotz_Stop_Down","Gotz_Stop_Base","Gotz_Stop_Left","Gotz_Stop_Right","Gotz_Down","Gotz_Base","Gotz_Left","Gotz_Right","Gotz_Hands_Down","Gotz_Hands_Base","Gotz_Hands_Left","Gotz_Hands_Right","Gotz_Working_Down","Gotz_Working_Base","Gotz_Working_Left","Gotz_Working_Right","Gotz_Working2_Down","Gotz_Working2_Base","Gotz_Working2_Left","Gotz_Working2_Right","May_Stop_Down","May_Stop_Base","May_Stop_Left","May_Stop_Right","May_Down","May_Base","May_Left","May_Right","Barley_Stop_Down","Barley_Stop_Base","Barley_Stop_Left","Barley_Stop_Right","Barley_Down","Barley_Base","Barley_Left","Barley_Right"];
+const NAMES_POR = ["Rick_Neutral","Rick_Happy","Rick_Angry","Rick_Afraid","Rick_Surprised","Rick_Ruborized","Rick_Weeding","Popuri_Neutral","Popuri_Happy","Popuri_Angry","Popuri_Afraid","Popuri_Surprised","Popuri_Ruborized","Popuri_Weeding","Lilia_Neutral","Lilia_Happy","Lilia_Angry","Lilia_Afraid","Baby_Neutral","Baby_Happy","Baby_Angry","Baby_Crying","Baby_Indignated","Cliff_Neutral","Cliff_Happy","Cliff_Angry","Cliff_Afraid","Cliff_Surprised","Cliff_Ruborized","Cliff_Weeding","Cliff_Colapsed","Zack_Neutral","Zack_Happy","Zack_Angry","Zack_Afraid","Doctor_Neutral","Doctor_Happy","Doctor_Angry","Doctor_Afraid","Doctor_Surprised","Doctor_Ruborized","Doctor_Weeding","Staid_Neutral","Staid_Scared","Nappy_Neutral","Nappy_Scared","Bold_Neutral","Bold_Scared","Chef_Neutral","Chef_Scared","Aqua_Neutral","Aqua_Scared","Hoggy_Neutral","Hoggy_Scared","Timid_Neutral","Timid_Scared","H_Goddes_Neutral","H_Goddes_Happy","H_Goddes_Angry","Gourmet_Neutral","Gourmet_Happy","Gourmet_Angry","Gourmet_Afraid","Ellen_Neutral","Ellen_Happy","Ellen_Angry","Ellen_Afraid","Jeff_Neutral","Jeff_Happy","Jeff_Angry","Jeff_Afraid","Jeff_Hurt","Karen_Neutral","Karen_Happy","Karen_Angry","Karen_Afraid","Karen_Surprised","Karen_Ruborized","Karen_Weeding","Sasha_Neutral","Sasha_Happy","Sasha_Angry","Sasha_Afraid","Doug_Neutral","Doug_Happy","Doug_Angry","Doug_Afraid","Ann_Neutral","Ann_Happy","Ann_Angry","Ann_Afraid","Ann_Surprised","Ann_Ruborized","Ann_Weeding","Ruby_Neutral","Ruby_Happy","Ruby_Angry","Ruby_Afraid","Kappa_Neutral","Basil_Neutral","Basil_Happy","Basil_Angry","Basil_Afraid","Mary_Neutral","Mary_Happy","Mary_Angry","Mary_Afraid","Mary_Surprised","Mary_Ruborized","Mary_Weeding","Anna_Neutral","Anna_Happy","Anna_Angry","Anna_Afraid","Won_Neutral","Won_Happy","Won_Angry","Thomas_Neutral","Thomas_Happy","Thomas_Angry","Thomas_Afraid","Ellie_Neutral","Ellie_Happy","Ellie_Angry","Ellie_Afraid","Ellie_Surprised","Ellie_Ruborized","Ellie_Weeding","Stu_Neutral","Stu_Happy","Stu_Angry","Stu_Afraid","Stu_Criying","Duke_Neutral","Duke_Happy","Duke_Angry","Duke_Afraid","Manna_Neutral","Manna_Happy","Manna_Angry","Manna_Afraid","Lou_Neutral","Lou_Happy","Lou_Angry","Lou_Afraid","Harris_Neutral","Harris_Happy","Harris_Angry","Harris_Afraid","Carter_Neutral","Carter_Happy","Carter_Angry","Carter_Afraid","Kai_Neutral","Kai_Happy","Kai_Angry","Kai_Afraid","Kai_Surprised","Kai_Ruborized","Kai_Weeding","Gray_Neutral","Gray_Happy","Gray_Angry","Gray_Afraid","Gray_Surprised","Gray_Timid","Gray_Ruborized","Gray_Weeding","Saibara_Neutral","Saibara_Happy","Saibara_Angry","Saibara_Afraid","Gotz_Neutral","Gotz_Happy","Gotz_Angry","Gotz_Afraid","May_Neutral","May_Happy","May_Angry","May_Afraid","Barley_Neutral","Barley_Happy","Barley_Angry","Barley_Afraid"];
+</script>
+<script src="fomt-hub.js"></script>
+<script>
+'use strict';
+/* Formato de los bancos de gráficos (verificado contra la ROM USA y el desensamblado de StanHash):
+   func_0805E6CC lee 7 secciones seguidas, cada una "u16 cantidad, u16 0" + cantidad × tamaño:
+     0 animaciones (4 B: u16 nº de pasos, u16 primer paso)   1 fotogramas (16 B: nº OAM, 1er OAM, nº tiles, 1er tile, nº paletas, 1ª paleta, nº/1º extra)
+     2 OAM (8 B: attr0, attr1, attr2, pad)  3 tiles 4bpp (32 B)  4 paletas (32 B)  5 extra (8 B)  6 pasos (4 B: u16 fotograma, u16 duración en frames)
+   Sprites: gUnk_0858BA28 (29 punteros en el código). Retratos: gUnk_0852D984 (3 punteros).
+   AActorEntity::RefreshSprite usa anim_id + facing (0 abajo, 1 arriba, 2 izquierda, 3 derecha). */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const hex = (n, w = 3) => "0x" + n.toString(16).toUpperCase().padStart(w, "0");
+const ROM_SHA1 = "a2fc3574f0a65a4fcf7682fb274b9d7eebdef963", ROM_BASE = 0x08000000;
+const SEC = [4, 16, 8, 32, 32, 8, 4];
+const OBJ_SZ = {"0,0":[8,8],"0,1":[16,16],"0,2":[32,32],"0,3":[64,64],"1,0":[16,8],"1,1":[32,8],"1,2":[32,16],"1,3":[64,32],"2,0":[8,16],"2,1":[8,32],"2,2":[16,32],"2,3":[32,64]};
+const DIRS = ["Abajo", "Arriba", "Izquierda", "Derecha"];
+const GUARD = [0x46, 0x4D, 0x53, 0x50];   // "FMSP" tras un banco reubicado: marca el final para que nadie lo tome por espacio libre
+const BANKS = {
+  spr: {key: "spr", titulo: "Sprites", refs: [0xCC8,0x52714,0x584A4,0x733E8,0x8847C,0x88490,0x884BC,0x884D4,0x8BF0C,0x8BF20,0x8BF54,0x8BF6C,0x8C7C8,0x8C7DC,0x8C808,0x8C820,0x91200,0x91214,0x91248,0x91260,0x928C0,0x928D4,0x92908,0x92920,0xAC824,0xAE358,0xB4108,0xBCC94,0xC11D8], names: NAMES_SPR},
+  por: {key: "por", titulo: "Retratos", refs: [0xADC7C, 0xADD00, 0xADD3C], names: NAMES_POR}
+};
+
+const rd16 = (b, o) => b[o] | (b[o + 1] << 8);
+const rd32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+const wr16 = (b, o, v) => { b[o] = v & 255; b[o + 1] = (v >> 8) & 255; };
+const wr32 = (b, o, v) => { wr16(b, o, v & 0xFFFF); wr16(b, o + 2, v >>> 16); };
+const rgbOf = c => [Math.floor((c & 31) * 255 / 31), Math.floor(((c >> 5) & 31) * 255 / 31), Math.floor(((c >> 10) & 31) * 255 / 31)];
+const bgrOf = (r, g, b) => (Math.round(r * 31 / 255)) | (Math.round(g * 31 / 255) << 5) | (Math.round(b * 31 / 255) << 10);
+
+let ORIG = null, WORK = null, ROMNAME = "", MODE = "spr", SEL = {spr: null, por: null}, SET = 0;
+let KB = {}, RUNS = {}, H0 = {}, SNAP = {spr: new Map(), por: new Map()}, NCOUNT0 = {}, CUSTOM = {spr: {}, por: {}}, LOG = [];
+const FC = new Map();   // caché de fotogramas dibujados: "banco:fotograma" -> {c, x0, y0, W, H}
+
+// ---------------------------------------------------------------- lectura del banco
+function bankOf(rom, B){
+  const ptr = rd32(rom, B.refs[0]);
+  for (const r of B.refs) if (rd32(rom, r) !== ptr) throw new Error(`${B.titulo}: los ${B.refs.length} punteros al banco no coinciden (${hex(r, 5)}). ¿Es la ROM USA?`);
+  const off = ptr - ROM_BASE; if (off < 0 || off + 4 > rom.length) throw new Error(`${B.titulo}: puntero fuera de la ROM (${hex(ptr, 8)})`);
+  const cnt = [], ofs = []; let p = off;
+  for (const sz of SEC) {
+    const c = rd16(rom, p);
+    if (rd16(rom, p + 2) !== 0 || p + 4 + c * sz > rom.length) throw new Error(`${B.titulo}: banco ilegible en ${hex(off, 6)}`);
+    cnt.push(c); ofs.push(p + 4); p += 4 + c * sz;
+  }
+  return {B, rom, off, cnt, ofs, end: p};
+}
+const animOf = (K, a) => ({n: rd16(K.rom, K.ofs[0] + a * 4), s: rd16(K.rom, K.ofs[0] + a * 4 + 2)});
+function scriptOf(K, a){
+  const {n, s} = animOf(K, a), out = [];
+  for (let i = 0; i < n; i++) { const o = K.ofs[6] + (s + i) * 4; if (s + i < K.cnt[6]) out.push([rd16(K.rom, o), rd16(K.rom, o + 2)]); }
+  return out;
+}
+function frameOf(K, f){
+  const o = K.ofs[1] + f * 16, v = [];
+  for (let i = 0; i < 8; i++) v.push(rd16(K.rom, o + 2 * i));
+  return {oc: v[0], os: v[1], tc: v[2], ts: v[3], pc: v[4], ps: v[5], xc: v[6], xs: v[7]};
+}
+function frameParts(K, f){
+  const F = frameOf(K, f), parts = [];
+  if (f >= K.cnt[1]) return {F, parts};
+  for (let k = 0; k < F.oc; k++) {
+    const po = K.ofs[2] + (F.os + k) * 8, a0 = rd16(K.rom, po), a1 = rd16(K.rom, po + 2), a2 = rd16(K.rom, po + 4);
+    if ((a0 & 0x300) === 0x200) continue;
+    const wh = OBJ_SZ[(a0 >> 14) + "," + (a1 >> 14)]; if (!wh) continue;
+    let x = a1 & 0x1ff, y = a0 & 0xff; if (x >= 256) x -= 512; if (y >= 128) y -= 256;
+    const aff = a0 & 0x100, pb = (a2 >> 12) & 15;
+    parts.push({x, y, w: wh[0], h: wh[1], t: F.ts + (a2 & 0x3ff), pal: F.ps + (pb < F.pc ? pb : 0), hf: aff ? 0 : (a1 >> 12) & 1, vf: aff ? 0 : (a1 >> 13) & 1});
+  }
+  return {F, parts};
+}
+// fotograma -> píxeles con su origen: idx (0 = transparente), pal (paleta de cada píxel), own (byte de tile que guarda el píxel, -1 = sin tile), sub (nibble alto)
+function frameRaster(K, f){
+  const {F, parts} = frameParts(K, f);
+  if (!parts.length) return {F, x0: 0, y0: 0, W: 0, H: 0, idx: new Uint8Array(0), pal: new Uint16Array(0), own: new Int32Array(0), sub: new Uint8Array(0)};
+  const x0 = Math.min(...parts.map(q => q.x)), y0 = Math.min(...parts.map(q => q.y));
+  const W = Math.max(...parts.map(q => q.x + q.w)) - x0, H = Math.max(...parts.map(q => q.y + q.h)) - y0, n = W * H;
+  const idx = new Uint8Array(n), pal = new Uint16Array(n), own = new Int32Array(n).fill(-1), sub = new Uint8Array(n);
+  for (let k = parts.length - 1; k >= 0; k--) {   // el primer OAM queda delante
+    const q = parts[k];
+    for (let py = 0; py < q.h; py++) for (let px = 0; px < q.w; px++) {
+      const sx = q.hf ? q.w - 1 - px : px, sy = q.vf ? q.h - 1 - py : py, tt = q.t + (sy >> 3) * (q.w >> 3) + (sx >> 3);
+      if (tt >= K.cnt[3]) continue;
+      const off = K.ofs[3] + tt * 32 + (sy & 7) * 4 + ((sx & 7) >> 1), b = K.rom[off], c = (sx & 1) ? b >> 4 : b & 15;
+      const o = (q.y - y0 + py) * W + (q.x - x0 + px);
+      if (c) { idx[o] = c; own[o] = off; sub[o] = sx & 1; pal[o] = q.pal; }
+      else if (!idx[o]) { own[o] = off; sub[o] = sx & 1; pal[o] = q.pal; }
+    }
+  }
+  return {F, x0, y0, W, H, idx, pal, own, sub};
+}
+const palColor = (K, p, i) => p < K.cnt[4] ? rd16(K.rom, K.ofs[4] + p * 32 + i * 2) : 0;
+function frameCanvas(K, f){
+  const key = K.B.key + ":" + f; if (FC.has(key)) return FC.get(key);
+  const R = frameRaster(K, f), c = document.createElement("canvas");
+  c.width = Math.max(1, R.W); c.height = Math.max(1, R.H);
+  if (R.W) {
+    const cx = c.getContext("2d"), im = cx.createImageData(R.W, R.H);
+    for (let i = 0; i < R.idx.length; i++) if (R.idx[i]) { const k = rgbOf(palColor(K, R.pal[i], R.idx[i])); im.data.set([k[0], k[1], k[2], 255], i * 4); }
+    cx.putImageData(im, 0, 0);
+  }
+  const out = {c, x0: R.x0, y0: R.y0, W: R.W, H: R.H}; FC.set(key, out); return out;
+}
+
+// ---------------------------------------------------------------- personajes (tramos de animaciones con la misma paleta)
+const firstFrame = (K, a) => { const sc = scriptOf(K, a); return sc.length ? sc[0][0] : -1; };
+function isDirSet(K, a){
+  const sc = [0, 1, 2, 3].map(d => scriptOf(K, a + d));
+  if (sc.some(s => !s.length) || sc[2].length !== sc[3].length) return false;
+  return sc[2].every(([l], i) => { const fl = frameOf(K, l), fr = frameOf(K, sc[3][i][0]); return fl.ts === fr.ts && fl.os !== fr.os; });
+}
+const baseName = n => n.replace(/_(Down|Base|Up|Left|Right|down|up|left|right|Middle)\d*$/, "");
+function buildRuns(K){
+  const runs = []; let cur = null;
+  for (let a = 0; a < K.cnt[0]; a++) {
+    const f = firstFrame(K, a), ps = f >= 0 && f < K.cnt[1] ? frameOf(K, f).ps : -1;
+    if (!cur || cur.ps !== ps) { cur = {ps, anims: []}; runs.push(cur); }
+    cur.anims.push(a);
+  }
+  for (const r of runs) {
+    r.a0 = r.anims[0]; r.a1 = r.anims[r.anims.length - 1]; r.sets = [];
+    if (K.B.key === "spr") for (let i = 0; i + 3 < r.anims.length; i++) if (isDirSet(K, r.anims[i])) { r.sets.push(r.anims[i]); i += 3; }
+    const votes = {};
+    for (const a of r.anims) { const n = K.B.names[a]; if (n) { const t = n.split("_")[0]; votes[t] = (votes[t] || 0) + 1; } }
+    const best = Object.entries(votes).sort((p, q) => q[1] - p[1])[0];
+    r.nuevo = r.a0 >= NCOUNT0[K.B.key];
+    r.nombre = CUSTOM[K.B.key][r.a0] || (r.nuevo ? "Nuevo" : best ? best[0] : (K.B.key === "spr" ? "Sprite" : "Retrato")) + (r.nuevo || !best ? " " + hex(r.a0) : "");
+  }
+  return runs;
+}
+const animLabel = (K, a) => { const n = K.B.names[a]; return n ? (K.B.key === "por" ? n.split("_").slice(1).join(" ") || n : baseName(n).split("_").slice(1).join(" ") || n) : ""; };
+
+// hoja PNG: una fila por animación del personaje, una columna por fotograma que aún no salió en filas anteriores
+function sheetLayout(K, run){
+  const rows = [], seen = new Set(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const a of run.anims) {
+    const fr = [];
+    for (const [f] of scriptOf(K, a)) if (!seen.has(f) && f < K.cnt[1]) { seen.add(f); fr.push(f); }
+    if (fr.length) rows.push({a, frames: fr});
+  }
+  for (const r of rows) for (const f of r.frames) { const R = frameRaster(K, f); if (!R.W) continue;
+    x0 = Math.min(x0, R.x0); y0 = Math.min(y0, R.y0); x1 = Math.max(x1, R.x0 + R.W); y1 = Math.max(y1, R.y0 + R.H); }
+  if (x1 < x0) { x0 = y0 = 0; x1 = y1 = 8; }
+  return {rows, x0, y0, W: x1 - x0, H: y1 - y0, cols: Math.max(1, ...rows.map(r => r.frames.length))};
+}
+function runBox(K, anims){
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const a of anims) for (const [f] of scriptOf(K, a)) { const c = frameCanvas(K, f); if (!c.W) continue;
+    x0 = Math.min(x0, c.x0); y0 = Math.min(y0, c.y0); x1 = Math.max(x1, c.x0 + c.W); y1 = Math.max(y1, c.y0 + c.H); }
+  return x1 < x0 ? {x0: 0, y0: 0, W: 8, H: 8} : {x0, y0, W: x1 - x0, H: y1 - y0};
+}
+
+// ---------------------------------------------------------------- huellas para verificar (contenido, no posición en la ROM)
+function bankHashes(K){
+  const fh = new Map(), out = new Uint32Array(K.cnt[0]);
+  const frameHash = f => {
+    if (fh.has(f)) return fh.get(f);
+    const R = frameRaster(K, f); let h = 2166136261;
+    const mix = v => { h = Math.imul(h ^ (v & 0xFFFF), 16777619) >>> 0; h = Math.imul(h ^ (v >>> 16), 16777619) >>> 0; };
+    mix(R.x0 + 512); mix(R.y0 + 512); mix(R.W); mix(R.H);
+    for (let i = 0; i < R.idx.length; i++) mix(R.idx[i] ? palColor(K, R.pal[i], R.idx[i]) : 0x10000);
+    fh.set(f, h); return h;
+  };
+  for (let a = 0; a < K.cnt[0]; a++) {
+    let h = 2166136261;
+    for (const [f, d] of scriptOf(K, a)) { h = Math.imul(h ^ d, 16777619) >>> 0; h = Math.imul(h ^ frameHash(f), 16777619) >>> 0; }
+    out[a] = h;
+  }
+  return out;
+}
+// tras cada cambio: guarda la huella de toda animación distinta de la ROM de partida (o nueva)
+function snapshot(){
+  for (const k of ["spr", "por"]) {
+    const hs = bankHashes(KB[k]), S = SNAP[k]; S.clear();
+    for (let a = 0; a < hs.length; a++) if (a >= H0[k].length || hs[a] !== H0[k][a]) S.set(a, hs[a]);
+  }
+}
+
+// ---------------------------------------------------------------- escribir: reubicar el banco con entradas nuevas
+const freeStart = rom => { let e = rom.length; while (e && rom[e - 1] === 0xFF) e--; return (e + 3) & ~3; };   // solo 0xFF: los ceros pueden ser relleno de código
+function serializeBank(K, add){
+  const extra = [add.anims, add.frames, null, add.tiles, add.pals, null, add.steps];
+  const parts = []; let size = 4;
+  for (let i = 0; i < 7; i++) {
+    const own = K.rom.subarray(K.ofs[i], K.ofs[i] + K.cnt[i] * SEC[i]);
+    const ex = extra[i] ? (extra[i] instanceof Uint8Array ? extra[i] : Uint8Array.from(extra[i].flatMap(v => v.flatMap(x => [x & 255, (x >> 8) & 255])))) : new Uint8Array(0);
+    const n = K.cnt[i] + ex.length / SEC[i];
+    if (n > 0xFFFF) throw new Error(`La sección ${i} del banco superaría 65535 entradas`);
+    parts.push([n, own, ex]); size += 4 + own.length + ex.length;
+  }
+  const out = new Uint8Array((size + 3) & ~3); let p = 0;
+  for (const [n, own, ex] of parts) { wr16(out, p, n); wr16(out, p + 2, 0); p += 4; out.set(own, p); p += own.length; out.set(ex, p); p += ex.length; }
+  out.set(GUARD, out.length - 4);
+  return out;
+}
+function placeBank(K, bytes){
+  let rom = WORK, at = freeStart(rom);
+  const g = K.end; let isGuard = g + 4 <= rom.length && GUARD.every((v, i) => rom[g + i] === v);
+  if (isGuard && ((g + 4 + 3) & ~3) >= at) at = K.off;   // el banco ya reubicado es lo último de la ROM: se reescribe en su sitio
+  if (at + bytes.length > rom.length) {
+    const target = Math.ceil((at + bytes.length) / 0x100000) * 0x100000;
+    if (target > 0x2000000) throw new Error("No cabe ni ampliando la ROM a 32 MB");
+    const big = new Uint8Array(target).fill(0xFF); big.set(rom); rom = big;
+  }
+  rom.set(bytes, at);
+  for (const r of K.B.refs) { if (rd32(rom, r) !== K.off + ROM_BASE) throw new Error(`Puntero inesperado en ${hex(r, 5)}`); wr32(rom, r, at + ROM_BASE); }
+  WORK = rom; return at;
+}
+// copia un personaje entero (animaciones, pasos, fotogramas, tiles y paletas propios; los OAM se comparten) al final del banco
+function cloneRun(K, run){
+  const frames = [], seen = new Set();
+  for (const a of run.anims) for (const [f] of scriptOf(K, a)) if (!seen.has(f) && f < K.cnt[1]) { seen.add(f); frames.push(f); }
+  const need = f => { const {F, parts} = frameParts(K, f); let m = F.tc; for (const q of parts) m = Math.max(m, q.t - F.ts + (q.w >> 3) * (q.h >> 3)); return m; };
+  const iv = frames.map(f => { const F = frameOf(K, f); return [F.ts, Math.min(K.cnt[3], F.ts + need(f))]; }).sort((p, q) => p[0] - q[0]);
+  const blocks = []; for (const [a, b] of iv) { const l = blocks[blocks.length - 1]; if (l && a <= l[1]) l[1] = Math.max(l[1], b); else blocks.push([a, b]); }
+  let nt = 0; const tileParts = [];
+  for (const b of blocks) { b.push(K.cnt[3] + nt); tileParts.push(K.rom.subarray(K.ofs[3] + b[0] * 32, K.ofs[3] + b[1] * 32)); nt += b[1] - b[0]; }
+  const tiles = new Uint8Array(nt * 32); let tp = 0; for (const t of tileParts) { tiles.set(t, tp); tp += t.length; }
+  const mapTile = t => { const b = blocks.find(q => t >= q[0] && t < q[1]); return b ? b[2] + t - b[0] : t; };
+  const palMap = new Map(), palBytes = [];
+  for (const f of frames) { const F = frameOf(K, f), n = Math.max(1, F.pc);
+    if (!palMap.has(F.ps)) { palMap.set(F.ps, K.cnt[4] + palBytes.length / 32); for (let i = 0; i < n * 32; i++) palBytes.push(K.rom[K.ofs[4] + F.ps * 32 + i] || 0); } }
+  const fMap = new Map(), newFrames = [];
+  frames.forEach((f, i) => { const F = frameOf(K, f); fMap.set(f, K.cnt[1] + i); newFrames.push([F.oc, F.os, F.tc, mapTile(F.ts), F.pc, palMap.get(F.ps), F.xc, F.xs]); });
+  const anims = [], steps = [];
+  for (const a of run.anims) { const sc = scriptOf(K, a); anims.push([sc.length, K.cnt[6] + steps.length]); for (const [f, d] of sc) steps.push([fMap.has(f) ? fMap.get(f) : f, d]); }
+  return {add: {anims, steps, frames: newFrames, tiles, pals: Uint8Array.from(palBytes)}, a0: K.cnt[0], n: anims.length};
+}
+
+// ---------------------------------------------------------------- PNG -> tiles
+function loadImageData(file){
+  return createImageBitmap(file).then(bm => {
+    const c = document.createElement("canvas"); c.width = bm.width; c.height = bm.height;
+    const cx = c.getContext("2d", {willReadFrequently: true}); cx.drawImage(bm, 0, 0);
+    return cx.getImageData(0, 0, bm.width, bm.height);
+  });
+}
+// colores opacos de la imagen -> hasta 15 colores (corte por la mediana sobre BGR555)
+function paletteFromImage(img){
+  const cnt = new Map(), d = img.data;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] >= 128) { const c = bgrOf(d[i], d[i + 1], d[i + 2]); cnt.set(c, (cnt.get(c) || 0) + 1); }
+  let boxes = [[...cnt.entries()].map(([c, n]) => [c & 31, (c >> 5) & 31, (c >> 10) & 31, n])];
+  if (!boxes[0].length) return [];
+  while (boxes.length < 15) {
+    let bi = -1, bd = 0, ax = 0;
+    boxes.forEach((b, i) => { if (b.length < 2) return; for (let k = 0; k < 3; k++) { const v = b.map(q => q[k]), r = Math.max(...v) - Math.min(...v); if (r > bd) { bd = r; bi = i; ax = k; } } });
+    if (bi < 0) break;
+    const b = boxes[bi].sort((p, q) => p[ax] - q[ax]), tot = b.reduce((s, q) => s + q[3], 0); let acc = 0, cut = 1;
+    for (let i = 0; i < b.length - 1; i++) { acc += b[i][3]; if (acc >= tot / 2) { cut = i + 1; break; } cut = i + 1; }
+    boxes.splice(bi, 1, b.slice(0, cut), b.slice(cut));
+  }
+  return boxes.map(b => { const t = b.reduce((s, q) => s + q[3], 0); return [0, 1, 2].map(k => Math.round(b.reduce((s, q) => s + q[k] * q[3], 0) / t)); })
+    .map(([r, g, b]) => r | (g << 5) | (b << 10));
+}
+// escribe la hoja en los tiles del personaje; mode "keep" = paleta actual, "png" = paleta sacada de la imagen
+function applySheet(K, run, img, mode){
+  const L = sheetLayout(K, run), wantW = L.cols * L.W, wantH = L.rows.length * L.H;
+  if (img.width !== wantW || img.height !== wantH)
+    throw new Error(`La hoja debe medir ${wantW}×${wantH} px (${L.cols} columnas × ${L.rows.length} filas de ${L.W}×${L.H}); la imagen mide ${img.width}×${img.height}. Exporta la hoja de este personaje y dibuja encima.`);
+  const rom = K.rom, d = img.data, pals = new Set();
+  for (const r of L.rows) for (const f of r.frames) { const F = frameOf(K, f); for (let i = 0; i < Math.max(1, F.pc); i++) pals.add(F.ps + i); }
+  if (mode === "png") {
+    const pc = paletteFromImage(img);
+    for (const p of pals) for (let i = 1; i < 16; i++) wr16(rom, K.ofs[4] + p * 32 + i * 2, pc.length ? pc[(i - 1) % pc.length] : 0);
+  }
+  const palRGB = new Map(); for (const p of pals) palRGB.set(p, Array.from({length: 16}, (_, i) => rgbOf(palColor(K, p, i))));
+  const tileBy = new Map(), target = []; let dropped = 0;
+  L.rows.forEach((row, ri) => row.frames.forEach((f, ci) => {
+    const R = frameRaster(K, f), want = new Uint8Array(R.W * R.H);
+    const cx0 = ci * L.W, cy0 = ri * L.H;
+    for (let y = 0; y < L.H; y++) for (let x = 0; x < L.W; x++) {   // píxeles opacos fuera de los OAM de este fotograma
+      const lx = x + L.x0 - R.x0, ly = y + L.y0 - R.y0, inside = lx >= 0 && ly >= 0 && lx < R.W && ly < R.H && R.own[ly * R.W + lx] >= 0;
+      if (!inside && d[((cy0 + y) * img.width + cx0 + x) * 4 + 3] >= 128) dropped++;
+    }
+    for (let i = 0; i < R.W * R.H; i++) {
+      const own = R.own[i]; if (own < 0) continue;
+      const X = cx0 + (i % R.W) + R.x0 - L.x0, Y = cy0 + Math.floor(i / R.W) + R.y0 - L.y0, j = (Y * img.width + X) * 4;
+      let q = 0;
+      if (d[j + 3] >= 128) { const P = palRGB.get(R.pal[i]); let bd = 1e12;
+        for (let c = 1; c < 16; c++) { const k = P[c], e = (k[0] - d[j]) ** 2 + (k[1] - d[j + 1]) ** 2 + (k[2] - d[j + 2]) ** 2; if (e < bd) { bd = e; q = c; } } }
+      want[i] = q;
+      const tile = own - ((own - K.ofs[3]) % 32);
+      if (tileBy.has(tile) && tileBy.get(tile) !== f) continue;   // tile compartido con un fotograma anterior de la hoja: manda el primero
+      tileBy.set(tile, f);
+      rom[own] = R.sub[i] ? (rom[own] & 15) | (q << 4) : (rom[own] & 0xF0) | q;
+    }
+    target.push([f, want]);
+  }));
+  let shared = 0;   // relectura: cada fotograma vuelve a leerse de los tiles y se compara con lo pedido
+  for (const [f, want] of target) { const R = frameRaster(K, f); for (let i = 0; i < want.length; i++) if (R.own[i] >= 0 && R.idx[i] !== want[i]) shared++; }
+  let others = 0;   // otras animaciones que usan la misma paleta (cambian de color si la paleta sale del PNG)
+  if (mode === "png") { const inRun = new Set(run.anims);
+    for (let a = 0; a < K.cnt[0]; a++) if (!inRun.has(a) && scriptOf(K, a).some(([f]) => f < K.cnt[1] && pals.has(frameOf(K, f).ps))) others++; }
+  return {frames: target.length, tiles: tileBy.size, dropped, shared, others, W: L.W, H: L.H};
+}
+
+// ---------------------------------------------------------------- estado
+function refresh(){
+  FC.clear();
+  for (const k of ["spr", "por"]) { KB[k] = bankOf(WORK, BANKS[k]); RUNS[k] = buildRuns(KB[k]); }
+}
+async function sha1hex(b){ try { const h = await crypto.subtle.digest("SHA-1", b); return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, "0")).join(""); } catch (e) { return null; } }
+async function loadRom(bytes, name){
+  const rom = new Uint8Array(bytes);
+  try {
+    const head = String.fromCharCode(...rom.subarray(0xA0, 0xAC)), code = String.fromCharCode(...rom.subarray(0xAC, 0xB0));
+    if (head !== "HARVESTMOGBA" || code !== "A4NE") throw new Error("La cabecera no es la de FoMT USA (A4NE).");
+    ORIG = rom.slice(); WORK = rom.slice(); ROMNAME = name || "rom.gba"; LOG = []; CUSTOM = {spr: {}, por: {}};
+    const K = {spr: bankOf(ORIG, BANKS.spr), por: bankOf(ORIG, BANKS.por)};
+    for (const k of ["spr", "por"]) { H0[k] = bankHashes(K[k]); SNAP[k].clear(); NCOUNT0[k] = K[k].cnt[0]; }
+    refresh();
+    const sha = await sha1hex(rom);
+    $("romst").textContent = `${ROMNAME} · ${KB.spr.cnt[0]} anims de sprite, ${KB.por.cnt[0]} retratos${sha === ROM_SHA1 ? " ✓ USA original" : " · ROM modificada"}`;
+    $("genbtn").disabled = false;
+    SEL = {spr: null, por: null}; renderList(); renderStage(); renderSide();
+  } catch (e) { $("romst").textContent = "ROM: error — " + e.message; }
+}
+function curRun(){ const rs = RUNS[MODE] || []; return rs.find(r => r.a0 === SEL[MODE]) || null; }
+
+// ---------------------------------------------------------------- reproductor
+let PLAYERS = [];
+function player(K, anims, box, scale, label){
+  const cv = document.createElement("canvas"); cv.className = "pl"; cv.width = box.W * scale; cv.height = box.H * scale;
+  cv.style.width = cv.width + "px"; cv.style.height = cv.height + "px";
+  const p = {cv, cx: cv.getContext("2d"), K, sc: scriptOf(K, anims[0]), box, scale, i: 0, t: 0, drawn: -1};
+  p.cx.imageSmoothingEnabled = false; PLAYERS.push(p); if (label) cv.title = label; return cv;
+}
+function tick(){
+  for (const p of PLAYERS) {
+    if (!p.sc.length) continue;
+    const d = p.sc[p.i][1];
+    if (p.drawn >= 0 && d > 0 && ++p.t >= d) { p.t = 0; p.i = (p.i + 1) % p.sc.length; }
+    if (p.drawn === p.i) continue;
+    const fc = frameCanvas(p.K, p.sc[p.i][0]), s = p.scale;
+    p.cx.clearRect(0, 0, p.cv.width, p.cv.height);
+    if (fc.W) p.cx.drawImage(fc.c, (fc.x0 - p.box.x0) * s, (fc.y0 - p.box.y0) * s, fc.W * s, fc.H * s);
+    p.drawn = p.i;
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// ---------------------------------------------------------------- interfaz
+function renderList(){
+  const el = $("list");
+  if (!WORK) return;
+  const q = $("q").value.trim().toLowerCase(), only4 = $("only4").checked && MODE === "spr";
+  let rs = RUNS[MODE].filter(r => !only4 || r.sets.length || r.nuevo);
+  if (q) { const n = parseInt(q, 16); rs = rs.filter(r => r.nombre.toLowerCase().includes(q) || (/^0x[0-9a-f]+$/.test(q) && n >= r.a0 && n <= r.a1)); }
+  el.innerHTML = rs.length ? rs.map(r => `<button class="item${r.a0 === SEL[MODE] ? " on" : ""}" data-a="${r.a0}"><span${r.nuevo ? ' class="new"' : ""}>${esc(r.nombre)}</span><small>${hex(r.a0)}${r.a1 > r.a0 ? "–" + hex(r.a1) : ""}${r.sets.length ? " · " + r.sets.length + "×4" : ""}</small></button>`).join("")
+    : `<div class="empty">Nada coincide.</div>`;
+  el.querySelectorAll(".item").forEach(b => b.onclick = () => { SEL[MODE] = +b.dataset.a; SET = 0; renderList(); renderStage(); renderSide(); });
+}
+function swatches(K, ps){ let h = ""; for (let i = 1; i < 16; i++) { const k = rgbOf(palColor(K, ps, i)); h += `<i style="background:rgb(${k})"></i>`; } return `<span class="sw">${h}</span>`; }
+function renderStage(){
+  PLAYERS = [];
+  const st = $("stage"), r = curRun();
+  if (!WORK) return;
+  if (!r) { st.innerHTML = `<div class="empty">Elige un ${MODE === "spr" ? "personaje" : "retrato"} de la lista.${MODE === "spr" ? " Los NPC del pueblo tienen grupos de 4 animaciones seguidas (abajo, arriba, izquierda, derecha)." : ""}</div>`; return; }
+  const K = KB[MODE], box = runBox(K, r.anims), big = Math.max(2, Math.min(5, Math.floor(160 / Math.max(box.W, box.H)))), small = Math.max(1, Math.min(3, Math.floor(96 / Math.max(box.W, box.H))));
+  st.innerHTML = `<h2>${esc(r.nombre)}</h2><div class="meta">${MODE === "spr" ? "anims" : "retratos"} ${hex(r.a0)}–${hex(r.a1)} (${r.anims.length}) · paleta ${r.ps}${swatches(K, r.ps)}${r.nuevo ? " · nuevo" : ""}</div>`;
+  if (r.sets.length) {
+    if (SET >= r.sets.length) SET = 0;
+    const sets = document.createElement("div"); sets.className = "sets";
+    r.sets.forEach((a, i) => { const b = document.createElement("button"); b.textContent = `${hex(a)} ${animLabel(K, a) || ""}`.trim(); b.className = i === SET ? "on" : ""; b.onclick = () => { SET = i; renderStage(); }; sets.appendChild(b); });
+    st.appendChild(sets);
+    const a = r.sets[SET], sbox = runBox(K, [a, a + 1, a + 2, a + 3]), poses = document.createElement("div"); poses.className = "poses";
+    DIRS.forEach((dn, d) => { const p = document.createElement("div"); p.className = "pose"; p.innerHTML = `<b>${dn}</b><small>anim ${hex(a + d)} = base + ${d}</small>`; p.insertBefore(player(K, [a + d], sbox, big), p.lastChild); poses.appendChild(p); });
+    st.appendChild(poses);
+  }
+  const h = document.createElement("h3"); h.textContent = MODE === "spr" ? "Todas las animaciones del personaje" : "Expresiones"; st.appendChild(h);
+  const g = document.createElement("div"); g.className = "grid";
+  for (const a of r.anims) { const c = document.createElement("div"); c.className = "cell"; c.appendChild(player(K, [a], box, small)); const s = document.createElement("small"); s.textContent = `${hex(a)} ${animLabel(K, a)}`; s.title = s.textContent; c.appendChild(s); g.appendChild(c); }
+  st.appendChild(g);
+}
+function renderSide(){
+  const sd = $("side"), r = curRun();
+  const changes = LOG.length ? `<ul class="log">${LOG.map(x => `<li>${esc(x)}</li>`).join("")}</ul><button class="btn" id="undoall">Deshacer todo</button>` : `<p>Sin cambios todavía.</p>`;
+  if (!WORK || !r) { sd.innerHTML = `<div class="side"><h4>Cambios</h4>${WORK ? changes : "<p>Abre la ROM.</p>"}</div>`; bindUndo(); return; }
+  const K = KB[MODE], L = sheetLayout(K, r), kind = MODE === "spr" ? "NPC" : "retrato";
+  sd.innerHTML = `
+  <div class="side"><h4>Hoja PNG</h4>
+    <p>${L.cols} columnas × ${L.rows.length} filas, celdas de <b>${L.W}×${L.H}</b>. Cada fila es una animación; cada columna, un fotograma que no apareció en filas anteriores. Fondo transparente = color 0.</p>
+    <button class="btn" id="exp">Exportar hoja PNG</button></div>
+  <div class="side"><h4>Reemplazar con PNG</h4>
+    <p>Dibuja sobre la hoja exportada (mismo tamaño). Si dos fotogramas comparten tiles (p. ej. derecha = izquierda espejada) manda el que esté antes en la hoja.</p>
+    <label for="impf">Hoja PNG</label><input type="file" id="impf" accept="image/png,image/*">
+    <label for="impm">Paleta</label><select id="impm"><option value="keep">Mantener la paleta actual</option><option value="png">Sacarla del PNG (hasta 15 colores)</option></select>
+    <button class="btn primary" id="imp">Importar e inyectar</button><div class="msg" id="impmsg"></div></div>
+  <div class="side"><h4>${MODE === "spr" ? "NPC nuevo" : "Retratos nuevos"} con esta plantilla</h4>
+    <p>Copia ${r.anims.length} ${MODE === "spr" ? "animaciones" : "expresiones"} al final del banco con tiles y paleta propios (reubica el banco y repunta sus ${BANKS[MODE].refs.length} punteros). ${MODE === "spr" ? "El NPC nuevo se usa con su anim base + dirección, igual que los originales." : "El ID del retrato nuevo es su número de animación."}</p>
+    <label for="nnm">Nombre (solo para esta herramienta)</label><input type="text" id="nnm" placeholder="Mi ${kind}">
+    <label for="nnf">Hoja PNG (opcional; si no, copia los gráficos)</label><input type="file" id="nnf" accept="image/png,image/*">
+    <label for="nnm2">Paleta</label><select id="nnm2"><option value="png">Sacarla del PNG (hasta 15 colores)</option><option value="keep">Copiar la de la plantilla</option></select>
+    <button class="btn primary" id="nnb">Crear ${kind} nuevo</button><div class="msg" id="nnmsg"></div></div>
+  <div class="side"><h4>Cambios</h4>${changes}</div>`;
+  $("exp").onclick = () => exportSheet(K, r, L);
+  $("imp").onclick = async () => {
+    const f = $("impf").files[0], m = $("impmsg"); if (!f) { m.className = "msg bad"; m.textContent = "Elige un PNG."; return; }
+    try { const img = await loadImageData(f), res = applySheet(KB[MODE], r, img, $("impm").value);
+      LOG.push(`${BANKS[MODE].titulo} «${r.nombre}»: PNG importado (${res.frames} fotogramas, ${res.tiles} tiles${$("impm").value === "png" ? ", paleta nueva" : ""})`);
+      after(); const m2 = $("impmsg"); m2.className = "msg ok"; m2.textContent = resMsg(res);
+    } catch (e) { m.className = "msg bad"; m.textContent = e.message; }
+  };
+  $("nnb").onclick = async () => {
+    const m = $("nnmsg");
+    try {
+      const f = $("nnf").files[0], img = f ? await loadImageData(f) : null;
+      if (img) { const want = [L.cols * L.W, L.rows.length * L.H]; if (img.width !== want[0] || img.height !== want[1]) throw new Error(`La hoja debe medir ${want[0]}×${want[1]} px (la de esta plantilla).`); }
+      const res = createFrom(MODE, r, $("nnm").value.trim(), img, $("nnm2").value);
+      SEL[MODE] = res.a0; SET = 0; renderList(); renderStage(); renderSide();
+      const m2 = $("nnmsg"); m2.className = "msg ok";
+      m2.textContent = `✓ Creado en ${hex(res.a0)}–${hex(res.a0 + res.n - 1)}.` + (MODE === "spr" && res.sets.length ? `\nAnims base con 4 direcciones: ${res.sets.map(a => hex(a)).join(", ")}` : "") + (res.imp ? "\n" + resMsg(res.imp) : "") + (MODE === "por" && res.a0 + res.n > 256 ? "\n⚠ Algún ID pasa de 255." : "");
+    } catch (e) { m.className = "msg bad"; m.textContent = e.message; }
+  };
+  bindUndo();
+}
+const resMsg = r => `✓ ${r.frames} fotogramas, ${r.tiles} tiles reescritos y releídos.` + (r.dropped ? `\n${r.dropped} píxeles opacos caen fuera de los OAM y se ignoran.` : "") + (r.shared ? `\n${r.shared} píxeles no se aplicaron porque su tile lo comparte un fotograma anterior.` : "") + (r.others ? `\nOjo: ${r.others} animaciones de fuera de este personaje usan la misma paleta y también cambian de color.` : "");
+function bindUndo(){ const u = $("undoall"); if (u) u.onclick = () => { if (!confirm("¿Descartar todos los cambios y volver a la ROM cargada?")) return; WORK = ORIG.slice(); LOG = []; CUSTOM = {spr: {}, por: {}}; refresh(); snapshot(); renderList(); renderStage(); renderSide(); }; }
+function after(){ refresh(); snapshot(); renderList(); renderStage(); renderSide(); }
+function createFrom(k, run, name, img, mode){
+  const K = KB[k], c = cloneRun(K, run);
+  placeBank(K, serializeBank(K, c.add));
+  refresh();
+  const nr = RUNS[k].find(r => r.a0 === c.a0); let imp = null;
+  if (!nr) throw new Error("El personaje nuevo no aparece al releer el banco");
+  if (img) imp = applySheet(KB[k], nr, img, mode);
+  if (name) CUSTOM[k][c.a0] = name;
+  LOG.push(`${BANKS[k].titulo}: «${name || "Nuevo"}» creado en ${hex(c.a0)}–${hex(c.a0 + c.n - 1)} desde «${run.nombre}»${img ? " con PNG" : ""}`);
+  refresh(); snapshot();
+  const fin = RUNS[k].find(r => r.a0 === c.a0);
+  return {a0: c.a0, n: c.n, sets: fin ? fin.sets : [], imp};
+}
+function exportSheet(K, run, L){
+  const c = document.createElement("canvas"); c.width = L.cols * L.W; c.height = L.rows.length * L.H; const cx = c.getContext("2d");
+  L.rows.forEach((row, ri) => row.frames.forEach((f, ci) => { const fc = frameCanvas(K, f); if (fc.W) cx.drawImage(fc.c, ci * L.W + fc.x0 - L.x0, ri * L.H + fc.y0 - L.y0); }));
+  c.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${run.nombre.replace(/[^\w-]+/g, "_")}_${hex(run.a0)}_${L.W}x${L.H}.png`; a.click(); });
+}
+
+// ---------------------------------------------------------------- generar y verificar
+function verify(rom){
+  const out = [], bad = [];
+  for (const k of ["spr", "por"]) {
+    const B = BANKS[k]; let K;
+    try { K = bankOf(rom, B); } catch (e) { bad.push(e.message); continue; }
+    const want = Math.max(NCOUNT0[k], ...[...SNAP[k].keys()].map(a => a + 1));
+    if (K.cnt[0] !== want) bad.push(`${B.titulo}: ${K.cnt[0]} animaciones al releer, se esperaban ${want}`);
+    const hs = bankHashes(K); let same = 0, chg = 0, nw = 0;
+    for (let a = 0; a < hs.length; a++) {
+      const exp = SNAP[k].has(a) ? SNAP[k].get(a) : (a < H0[k].length ? H0[k][a] : null);
+      if (exp === null || hs[a] !== exp) { bad.push(`${B.titulo}: la animación ${hex(a)} no se relee igual`); if (bad.length > 20) break; continue; }
+      if (a >= NCOUNT0[k]) nw++; else if (SNAP[k].has(a)) chg++; else same++;
+    }
+    const moved = K.off !== bankOf(ORIG, B).off;
+    out.push(`${B.titulo}: banco en ${hex(K.off + ROM_BASE, 8)}${moved ? " (reubicado, " + B.refs.length + " punteros actualizados)" : ""} · ${same} sin cambios idénticas a la ROM de partida · ${chg} modificadas · ${nw} nuevas — releídas desde los punteros del juego`);
+  }
+  for (let i = 0xA0; i < 0xC0; i++) if (rom[i] !== ORIG[i]) { bad.push("La cabecera de la ROM cambió"); break; }
+  return {out, bad};
+}
+$("genbtn").onclick = () => {
+  const dl = $("gendlg"), body = $("genbody"), foot = $("genfoot");
+  const rom = WORK.slice(), v = verify(rom);
+  body.innerHTML = `<p>${LOG.length ? `${LOG.length} cambios:` : "Sin cambios: la ROM saldrá igual."}</p>${LOG.length ? `<ul>${LOG.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    <p><b>Verificación de relectura</b> (se vuelve a leer la ROM generada desde cero):</p><ul>${v.out.map(x => `<li class="ok">${esc(x)}</li>`).join("")}${v.bad.map(x => `<li class="bad">${esc(x)}</li>`).join("")}</ul>
+    <p>${v.bad.length ? `<span class="bad">✗ La verificación falló: no se descarga.</span>` : `<span class="ok">✓ Verificación correcta.</span> ROM de ${(rom.length / 1048576).toFixed(rom.length % 1048576 ? 2 : 0)} MB${rom.length > ORIG.length ? " (ampliada: los emuladores la aceptan, un cartucho real quizá no)" : ""}.`}</p>`;
+  foot.innerHTML = "";
+  if (!v.bad.length) {
+    const b = document.createElement("button"); b.className = "btn primary"; b.textContent = "Descargar ROM (.gba)";
+    const name = ROMNAME.replace(/\.gba$/i, "") + " (sprites).gba";
+    b.onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([rom])); a.download = name; a.click(); };
+    foot.appendChild(b);
+    if (FomtHub.inSuite) { FomtHub.publish(rom, name); const s = document.createElement("span"); s.className = "ok"; s.style.alignSelf = "center"; s.textContent = "Enviada a la suite como ROM de trabajo."; foot.prepend(s); }
+  }
+  dl.showModal();
+};
+$("genclose").onclick = () => $("gendlg").close();
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  MODE = b.dataset.tab; document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+  $("only4").parentNode.style.display = MODE === "spr" ? "" : "none"; renderList(); renderStage(); renderSide();
+});
+$("q").oninput = renderList; $("only4").onchange = renderList;
+$("rom-in").onchange = async e => { const f = e.target.files[0]; if (f) await loadRom(await f.arrayBuffer(), f.name); e.target.value = ""; };
+FomtHub.onRom((b, name) => loadRom(b, name));
+</script>
+</body>
+</html>
