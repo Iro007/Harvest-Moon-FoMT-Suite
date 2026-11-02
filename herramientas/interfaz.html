@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interfaz y menús</title>
+<style>
+:root{
+  --bg:#14171a; --panel:#1b1f23; --panel2:#22272c; --line:#2f353b;
+  --ink:#e6e3dc; --mute:#8b9298; --acc:#5fc4b0; --acc2:#e0b45a; --bad:#e07a6a;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,monospace;
+  --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);display:flex;flex-direction:column;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:none;flex-wrap:wrap}
+header h1{font-size:15px;margin:0;font-weight:650}
+header .sub{color:var(--mute);font-size:12px}
+#romst{color:var(--mute);font-size:12px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--acc)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--acc);color:#0c1613;border-color:var(--acc);font-weight:600}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc2);outline-offset:1px}
+main{flex:1;display:grid;grid-template-columns:250px 1fr 300px;min-height:0}
+.col{overflow:auto;min-height:0;background:var(--panel)}
+.col.l{border-right:1px solid var(--line)} .col.r{border-left:1px solid var(--line)}
+.tabs{display:flex;position:sticky;top:0;background:var(--panel);z-index:2;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:9px 4px;cursor:pointer;color:var(--mute)}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--acc)}
+.grp{font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;padding:12px 12px 4px}
+.item{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:6px 12px;cursor:pointer}
+.item:hover{background:var(--panel2)} .item.on{background:var(--panel2);border-left-color:var(--acc)}
+.item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item small{color:var(--mute);font-family:var(--mono);font-size:11px;white-space:nowrap}
+.item .ed{color:var(--acc2)} .item.err span{color:var(--bad)}
+.empty{padding:28px 18px;color:var(--mute)} .empty strong{color:var(--ink)}
+#stage{overflow:auto;min-height:0;padding:16px 20px}
+#stage h2{margin:0 0 2px;font-size:17px}
+.meta{color:var(--mute);font-size:12px;font-family:var(--mono)}
+.note{color:var(--mute);font-size:12px;margin:4px 0 0}
+h3{font-size:12px;font-weight:600;color:var(--mute);margin:20px 0 8px;text-transform:uppercase;letter-spacing:.04em}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mute)}
+.bar label{display:inline-flex;gap:4px;align-items:center}
+.bar select{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.cv{overflow:auto;max-width:100%;max-height:70vh;border:1px solid var(--line);border-radius:6px;background:
+  repeating-conic-gradient(#2a2f35 0 25%,#23272c 0 50%) 0 0/16px 16px;display:inline-block}
+.cv canvas{display:block;image-rendering:pixelated;cursor:crosshair}
+.side{padding:12px 14px;border-bottom:1px solid var(--line)}
+.side h4{margin:0 0 6px;font-size:13px}
+.side p{margin:4px 0;color:var(--mute);font-size:12px}
+.side label{display:block;color:var(--mute);font-size:12px;margin:8px 0 3px}
+.side .btn{margin-top:6px}
+.pal{display:grid;grid-template-columns:28px repeat(16,1fr);gap:2px;align-items:center;margin:2px 0}
+.pal b{font:11px var(--mono);color:var(--mute)}
+.pal i{display:block;aspect-ratio:1;border:1px solid #0006;cursor:pointer;min-width:0}
+.pal i.on{outline:2px solid var(--acc2);outline-offset:0;position:relative;z-index:1}
+.pal i.t{background-image:linear-gradient(135deg,transparent 45%,#e07a6a 45% 55%,transparent 55%)}
+.cur{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--mute);margin-top:8px}
+.cur input[type=color]{width:44px;height:28px;padding:0;border:1px solid var(--line);background:none}
+.msg{font-size:12px;margin-top:8px;white-space:pre-wrap}
+.ok{color:var(--acc)} .bad{color:var(--bad)} .warn{color:var(--acc2)}
+table.tx{border-collapse:collapse;width:100%;font-size:13px}
+table.tx td{border-bottom:1px solid var(--line);padding:4px 6px;vertical-align:middle}
+table.tx td.a{font:11px var(--mono);color:var(--mute);white-space:nowrap}
+table.tx input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-family:var(--mono);font-size:12px}
+table.tx input.chg{border-color:var(--acc2)} table.tx input.mv{border-color:var(--bad)}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog .dh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+dialog .dh h3{margin:0;font-size:15px;flex:1;color:var(--ink);text-transform:none;letter-spacing:0}
+dialog .db{overflow:auto;padding:10px 16px;max-height:60vh}
+dialog .db li{margin:3px 0}
+dialog .df{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--line)}
+@media(max-width:1000px){main{grid-template-columns:200px 1fr}.col.r{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line)}main{grid-auto-rows:minmax(0,1fr) auto}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Interfaz y menús</h1><div class="sub">FoMT (GBA, USA) — pantallas de menú, objetos OAM, piezas del HUD y textos de menú leídos desde los punteros del código</div></div>
+  <div style="flex:1"></div>
+  <span id="romst">Sin ROM</span>
+  <label class="btn" for="rom-in">Abrir ROM (.gba)</label>
+  <input id="rom-in" type="file" accept=".gba" hidden>
+  <button class="btn primary" id="genbtn" disabled>Generar ROM</button>
+</header>
+<main>
+  <section class="col l" aria-label="Lista">
+    <div class="tabs" role="tablist"><button class="on" data-tab="gfx">Gráficos</button><button data-tab="txt">Textos</button></div>
+    <div id="list"><div class="empty"><strong>Abre la ROM</strong> (o cárgala en la suite) para ver los menús.</div></div>
+  </section>
+  <section id="stage" aria-label="Vista"><div class="empty">Elige un gráfico de la lista.</div></section>
+  <section class="col r" id="side" aria-label="Acciones"></section>
+</main>
+<dialog id="gendlg">
+  <div class="dh"><h3>Generar ROM</h3><button class="btn" id="genclose">Cerrar</button></div>
+  <div class="db" id="genbody"></div>
+  <div class="df" id="genfoot"></div>
+</dialog>
+<script src="fomt-hub.js"></script>
+<script>
+'use strict';
+/* Códec «popuri» (cabecera 0x70) copiado tal cual de mapas.html; unpack.end guarda dónde acaba el bloque leído. */
+function u32(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
+// El flujo se lee en palabras de 32 bits little-endian, de bit alto a bajo (igual que el juego y que decompress.py).
+function BitReader(d, o) {
+  this.d = d;
+  this.o = o;
+  this.w = 0;
+  this.n = 0;
+}
+BitReader.prototype.read = function (k) {
+  var out = 0, take, d = this.d, o;
+  while (k > 0) {
+    if (this.n === 0) {
+      o = this.o;
+      this.w = o + 3 < d.length ? ((d[o] | (d[o + 1] << 8) | (d[o + 2] << 16) | (d[o + 3] << 24)) >>> 0) : 0;
+      this.o = o + 4;
+      this.n = 32;
+    }
+    take = Math.min(k, this.n);
+    out = out * Math.pow(2, take) + ((this.w >>> (this.n - take)) & (take === 32 ? 0xFFFFFFFF : ((1 << take) - 1)));
+    this.n -= take;
+    k -= take;
+  }
+  return out;
+};
+
+function huffTree(br, bits) {
+  var tree = [0xFFFFFFFF], path = 0, total = 0, nb, i, c, node, pb, sh, child, leaf;
+  for (nb = 0; nb < bits * 2; nb++) {
+    c = br.read(bits); total += c;
+    if (total > (1 << bits)) return null;
+    path = path << 1;
+    for (i = 0; i < c; i++) {
+      node = 0;
+      for (pb = 0; pb < nb; pb++) {
+        sh = ((path >> (nb - pb)) & 1) * 16;
+        child = (tree[node] >>> sh) & 0xFFFF;
+        if (child === 0xFFFF) {
+          child = tree.length; tree.push(0xFFFFFFFF);
+          tree[node] = ((tree[node] & ~(0xFFFF << sh)) | (child << sh)) >>> 0;
+        }
+        node = child;
+      }
+      sh = (path & 1) * 16;
+      leaf = tree.length; tree.push((0x80000000 | br.read(bits)) >>> 0);
+      tree[node] = ((tree[node] & ~(0xFFFF << sh)) | (leaf << sh)) >>> 0;
+      path++;
+    }
+  }
+  for (i = 0; i < tree.length; i++) if ((tree[i] & 0xFFFF0000) >>> 0 === 0xFFFF0000 || (tree[i] & 0xFFFF) === 0xFFFF) return null;
+  return tree;
+}
+
+function huffDecode(br, tree) {
+  var cur = 0;
+  while ((tree[cur] >>> 31) === 0) cur = (tree[cur] >>> (br.read(1) * 16)) & 0xFFFF;
+  return tree[cur] & 0x7FFFFFF;
+}
+
+function ladderOf(br, n) {
+  var off = 1, out = [], bits;
+  for (var i = 0; i < n; i++) { bits = br.read(4) + 1; out.push({ s: off, b: bits }); off += Math.pow(2, bits); }
+  return out;
+}
+function dist(br, l) { return l.s + br.read(l.b); }
+function vli(br, k) {
+  var r = 0, a;
+  for (;;) { a = br.read(k); r = (r << (k - 1)) + (a >> 1); if (!(a & 1)) return r; }
+}
+function lookup(data, d, len) { for (var i = 0; i < len; i++) data.push(data[data.length - d]); }
+
+var LZSS = [
+  function (br, rd, data, size) {
+    var lad = ladderOf(br, 2), m, n, i, d, v;
+    while (data.length < size) {
+      m = br.read(2);
+      if (m === 2) { n = 1 + br.read(6); for (i = 0; i < n; i++) data.push(rd()); }
+      else if (m === 3) { n = 2 + br.read(6); v = br.read(8); for (i = 0; i < n; i++) data.push(v); }
+      else { d = dist(br, lad[m]); n = 3 + br.read(6); if (d > data.length) return false; lookup(data, d, n); }
+    }
+    return true;
+  },
+  function (br, rd, data, size) {
+    var lad = ladderOf(br, 4), d, n;
+    while (data.length < size) {
+      if (br.read(1) === 0) data.push(rd());
+      else { d = dist(br, lad[br.read(2)]); n = 3 + br.read(4); if (d > data.length) return false; lookup(data, d, n); }
+    }
+    return true;
+  },
+  function (br, rd, data, size) {
+    var lad = ladderOf(br, 7), idx, d, n, cnt, i;
+    while (data.length < size) {
+      if (br.read(1) === 0) { data.push(rd()); continue; }
+      idx = br.read(3);
+      if (idx < 7) { d = dist(br, lad[idx]); n = 3 + br.read(4); if (d > data.length) return false; lookup(data, d, n); }
+      else {
+        cnt = vli(br, 4);
+        if (br.read(1) === 0) { for (i = 0; i < cnt + 1; i++) data.push(rd()); }
+        else {
+          idx = br.read(3); if (idx === 7) return false;
+          d = dist(br, lad[idx]); n = br.read(4) + (cnt << 4) + 3;
+          if (d > data.length) return false; lookup(data, d, n);
+        }
+      }
+    }
+    return true;
+  },
+  function (br, rd, data, size) {
+    var lad = ladderOf(br, 3), idx, d, n, cnt, i;
+    while (data.length < size) {
+      if (br.read(1) === 0) { data.push(rd()); data.push(rd()); continue; }
+      idx = br.read(2);
+      if (idx < 3) { d = dist(br, lad[idx]); n = 2 + br.read(3); if (d * 2 > data.length) return false; lookup(data, d * 2, n * 2); }
+      else {
+        cnt = vli(br, 3);
+        if (br.read(1) === 0) { for (i = 0; i < cnt + 1; i++) { data.push(rd()); data.push(rd()); } }
+        else {
+          idx = br.read(2); if (idx === 3) return false;
+          d = dist(br, lad[idx]); n = br.read(3) + (cnt << 3) + 2;
+          if (d * 2 > data.length) return false; lookup(data, d * 2, n * 2);
+        }
+      }
+    }
+    return true;
+  },
+  function (br, rd, data, size) { while (data.length < size) data.push(rd()); return true; }
+];
+
+var DIFF = [
+  function () {},
+  function (a) { var acc = 0, i, lo, hi; for (i = 0; i < a.length; i++) { lo = a[i] & 15; hi = (a[i] >> 4) & 15; acc = (hi + acc) & 15; hi = acc; acc = (lo + acc) & 15; lo = acc; a[i] = lo | (hi << 4); } },
+  function (a) { var acc = 0, i; for (i = 0; i < a.length; i++) { acc = (a[i] + acc) & 255; a[i] = acc; } },
+  function (a) { var acc = 0, i, v; for (i = 0; i + 1 < a.length; i += 2) { v = ((a[i] | (a[i + 1] << 8)) + acc) & 0xFFFF; acc = v; a[i] = v & 255; a[i + 1] = v >> 8; } },
+  function (a) { var e = 0, o = 0, i; for (i = 0; i + 1 < a.length; i += 2) { e = (a[i] + e) & 255; o = (a[i + 1] + o) & 255; a[i] = e; a[i + 1] = o; } }
+];
+
+function unpack(rom, off) {
+  off = off & 0x01FFFFFF;
+  var head = u32(rom, off);
+  if ((head & 255) !== 0x70 || (head >>> 8) > 0x40000) throw new Error('cabecera popuri no válida en 0x' + off.toString(16));
+  var size = head >>> 8, br = new BitReader(rom, off + 4), fmt = br.read(8);
+  var lz = fmt & 7, atom = (fmt >> 3) & 3, df = (fmt >> 5) & 7, rd, t4, t8;
+  if (atom > 2 || lz > 4 || df > 4) throw new Error('formato de compresión no válido');
+  if (atom === 0) rd = function () { return br.read(8); };
+  else if (atom === 1) { t4 = huffTree(br, 4); if (!t4) throw new Error('árbol Huffman corrupto'); rd = function () { var hi = huffDecode(br, t4), lo = huffDecode(br, t4); return (hi << 4) | lo; }; }
+  else { t8 = huffTree(br, 8); if (!t8) throw new Error('árbol Huffman corrupto'); rd = function () { return huffDecode(br, t8); }; }
+  var data = [];
+  if (!LZSS[lz](br, rd, data, size)) throw new Error('flujo LZSS corrupto');
+  if (data.length > size) throw new Error('flujo LZSS desbordado');
+  DIFF[df](data);
+  unpack.end = br.o;
+  return Uint8Array.from(data);
+}
+
+function BitW() { this.words = []; this.cur = 0; this.n = 0; }
+BitW.prototype.put = function (v, k) {
+  while (k > 0) {
+    var take = Math.min(k, 32 - this.n), part = (v >>> (k - take)) & (take === 32 ? 0xFFFFFFFF : ((1 << take) - 1));
+    this.cur = (this.cur | (part << (32 - this.n - take))) >>> 0; this.n += take; k -= take;
+    if (this.n === 32) { this.words.push(this.cur); this.cur = 0; this.n = 0; }
+  }
+};
+
+function packPopuri(src) {
+  var n = src.length;
+  if (n & 1) throw new Error('el bloque debe tener un número par de bytes');
+  if (n > 0x3FFFF) throw new Error('bloque demasiado grande');
+  var hn = n >> 1, H = new Uint16Array(hn), j, bw = new BitW();
+  for (j = 0; j < hn; j++) H[j] = src[2 * j] | (src[2 * j + 1] << 8);
+  var B = [6, 10, 14], S = [1, 1 + (1 << 6), 1 + (1 << 6) + (1 << 10)], MAXD = (1 << 6) + (1 << 10) + (1 << 14);
+  var head = new Int32Array(65536).fill(-1), prev = new Int32Array(hn), i = 0;
+  bw.put(0x03, 8); bw.put(B[0] - 1, 4); bw.put(B[1] - 1, 4); bw.put(B[2] - 1, 4);
+  function hash(p) { return ((H[p] * 40503) ^ (H[p + 1] * 9973)) & 0xFFFF; }
+  function ins(p) { if (p + 1 < hn) { var h = hash(p); prev[p] = head[h]; head[h] = p; } }
+  while (i < hn) {
+    var bl = 0, bd = 0, cand = i + 1 < hn ? head[hash(i)] : -1, depth = 0, maxl = Math.min(9, hn - i);
+    while (cand >= 0 && depth++ < 256) {
+      var d = i - cand; if (d > MAXD) break;
+      var l = 0; while (l < maxl && H[cand + l] === H[i + l]) l++;
+      if (l > bl) { bl = l; bd = d; if (l === maxl) break; }
+      cand = prev[cand];
+    }
+    if (bl >= 2) {
+      var idx = bd < S[1] ? 0 : bd < S[2] ? 1 : 2;
+      bw.put(1, 1); bw.put(idx, 2); bw.put(bd - S[idx], B[idx]); bw.put(bl - 2, 3);
+      for (j = 0; j < bl; j++) ins(i + j);
+      i += bl;
+    } else { bw.put(0, 1); bw.put(H[i] & 255, 8); bw.put(H[i] >> 8, 8); ins(i); i++; }
+  }
+  if (bw.n > 0) bw.words.push(bw.cur);
+  bw.words.push(0);
+  var out = new Uint8Array(4 + bw.words.length * 4), dv = new DataView(out.buffer);
+  dv.setUint32(0, (0x70 | (n << 8)) >>> 0, true);
+  bw.words.forEach(function (w, k) { dv.setUint32(4 + k * 4, w, true); });
+  return out;
+}
+
+/* ================================================================ interfaz
+   Todo se localiza por el literal del código que guarda el puntero (ref), nunca por una dirección fija:
+   si otra herramienta (o esta misma) reubicó un bloque, se sigue leyendo bien. Verificado contra la ROM USA
+   (SHA1 a2fc3574…) y el desensamblado de StanHash_fomt:
+     Unpack(src, dst)             — bloque 0x70 → VRAM (tiles en 0x06000000, mapas en 0x0600E000–0x0600F800)
+     func_08008E64(src, dst, n)   — copia sin comprimir (paletas a 0x05000000)
+     func_08008F0C(obj, src, dst, n) — piezas sin comprimir del HUD
+     func_0805E6CC(obj, banco)    — banco OAM de 7 secciones (mismo formato que sprites.html) */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const hex = (n, w = 3) => "0x" + n.toString(16).toUpperCase().padStart(w, "0");
+const ROM_BASE = 0x08000000;
+const rd16 = (b, o) => b[o] | (b[o + 1] << 8);
+const rd32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+const wr16 = (b, o, v) => { b[o] = v & 255; b[o + 1] = (v >> 8) & 255; };
+const wr32 = (b, o, v) => { wr16(b, o, v & 0xFFFF); wr16(b, o + 2, v >>> 16); };
+const rgbOf = c => [Math.floor((c & 31) * 255 / 31), Math.floor(((c >> 5) & 31) * 255 / 31), Math.floor(((c >> 10) & 31) * 255 / 31)];
+const bgrOf = (r, g, b) => (Math.round(r * 31 / 255)) | (Math.round(g * 31 / 255) << 5) | (Math.round(b * 31 / 255) << 10);
+const SEC = [4, 16, 8, 32, 32, 8, 4];
+const OBJ_SZ = {"0,0":[8,8],"0,1":[16,16],"0,2":[32,32],"0,3":[64,64],"1,0":[16,8],"1,1":[32,8],"1,2":[32,16],"1,3":[64,32],"2,0":[8,16],"2,1":[8,32],"2,2":[16,32],"2,3":[32,64]};
+const GUARD = [0x46, 0x4D, 0x55, 0x49];   // "FMUI" tras lo escrito: que nadie tome nuestros ceros finales por espacio libre
+
+/* Pantallas: tiles y mapas comprimidos (0x70), paleta sin comprimir {ref, tamaño, destino dentro de la paleta BG}.
+   Los mapas van de atrás adelante; «alt» = son escenas alternativas (se ve una cada vez). */
+const SCREENS = [
+  {id: "titulo", cat: "Pantallas", name: "Pantalla de título", fn: "func_080019D8",
+   note: "4 capas BG de 32×64 tiles (la cámara baja del cielo al grupo de personajes). Los textos «start/continue» son OAM: ver «Título: start / continue».",
+   tiles: 0x1DC4, pal: {ref: 0x1DC8, size: 0x200, dst: 0}, maps: [0xE8684, 0xE8688, 0xE868C, 0xE8690]},
+  {id: "calendario", cat: "Pantallas", name: "Calendario", fn: "func_080A2BA4",
+   note: "Papel de fondo, casillas por día de la semana y rejilla (BG en 0x0600E000, 0x0600E800, 0x0600F000).",
+   tiles: 0xA2FDC, pal: {ref: 0xA2FE0, size: 0x200, dst: 0}, maps: [0xA2FD0, 0xA2FD4, 0xA2FD8]},
+  {id: "logo", cat: "Pantallas", name: "Logo de Natsume", fn: "func_08000F5C · func_08077810",
+   note: "Intro. Los mismos tiles los carga también func_08077810 (en 0x06008000).",
+   tiles: 0xFE8, pal: {ref: 0xFEC, size: 0x20, dst: 0}, maps: [0xFF0]},
+  {id: "granja_a", cat: "Pantallas", name: "Granja con parcelas", fn: "func_080C160C",
+   note: "Vista de la granja (paleta copiada en 0x05000020).", tiles: 0xC16C0, pal: {ref: 0xC16C4, size: 0x200, dst: 0x20}, maps: [0xC16B8, 0xC16BC]},
+  {id: "granja_b", cat: "Pantallas", name: "Campo con cultivos", fn: "func_080BCFAC",
+   note: "Fondo de tierra y capa de cultivos, tocones y piedras.", tiles: 0xBD054, pal: {ref: 0xBD058, size: 0x200, dst: 0}, maps: [0xBD04C, 0xBD050]},
+  {id: "interior", cat: "Pantallas", name: "Interior de madera", fn: "func_080AE7D0",
+   note: "", tiles: 0xAE884, pal: {ref: 0xAE888, size: 0x200, dst: 0}, maps: [0xAE87C, 0xAE880]},
+  {id: "ladrillo", cat: "Pantallas", name: "Muro de ladrillo con marcos", fn: "func_080B7164",
+   note: "", tiles: 0xB72F8, pal: {ref: 0xB7300, size: 0x200, dst: 0}, maps: [0xB72E8, 0xB72F0]},
+  {id: "playa", cat: "Pantallas", name: "Playa", fn: "func_08054F40",
+   note: "", tiles: 0x55094, pal: {ref: 0x55098, size: 0x200, dst: 0}, maps: [0x55084, 0x5508C]},
+  {id: "sepia", cat: "Pantallas", name: "Escenas en sepia (20)", fn: "func_0805FBB8", alt: true,
+   note: "20 mapas de 32×20 en la tabla de 0x0FB1E4; el juego muestra uno cada vez.",
+   tiles: 0x5FCB4, pal: {ref: 0x5FCB8, size: 0x40, dst: 0}, maps: Array.from({length: 20}, (_, i) => 0xFB1E4 + i * 4)}
+];
+/* Bancos OAM (func_0805E6CC). comp: el banco está comprimido (lo descomprime Unpack antes). */
+const BANKS = [
+  {id: "mochila", cat: "Objetos (OAM)", name: "Mochila: casillas y cursor", fn: "func_0803C5B0", ref: 0x3C78C,
+   note: "Menú de la mochila (func_0803C5B0, junto a los textos Diary / Rucksack / World Map de 0x0F1A34)."},
+  {id: "iconos", cat: "Objetos (OAM)", name: "Iconos de objetos", fn: "func_0803C5B0 y 100+ más", ref: 0x3C790,
+   note: "500 iconos: mochila, nevera y demás menús de objetos (lo apuntan más de 100 literales)."},
+  {id: "titulo_obj", cat: "Objetos (OAM)", name: "Título: start / continue", fn: "func_08000914", ref: 0xCB4, comp: true,
+   note: "Banco comprimido de la pantalla de título: botones «start» y «continue» y la línea de créditos."},
+  {id: "corazones", cat: "Objetos (OAM)", name: "Corazones de afecto", fn: "func_0804F288", ref: 0x4F694, note: ""}
+];
+/* Piezas sueltas del HUD sin comprimir (func_08008F0C): tiles y paleta de 16 colores. */
+const PIECES = [
+  {id: "cifras", cat: "Piezas del HUD", name: "Cifras 0–9, ×, =", fn: "func_0806644C", tiles: {ref: 0x67534, size: 0x1C0}, pal: {ref: 0x6785C, size: 0x20}, note: "Se copian a 0x06002A00 (BG) y su paleta a 0x05000040."},
+  {id: "barra1", cat: "Piezas del HUD", name: "Barra de medidor A", fn: "func_080645F0", tiles: {ref: 0x65714, size: 0x120}, pal: {ref: 0x65820, size: 0x20}, note: ""},
+  {id: "barra2", cat: "Piezas del HUD", name: "Barra de medidor B", fn: "func_08068344", tiles: {ref: 0x68CD8, size: 0x120}, pal: {ref: 0x68DF0, size: 0x20}, note: ""},
+  {id: "pieza1", cat: "Piezas del HUD", name: "Pieza 4 tiles (A)", fn: "func_0805FF14", tiles: {ref: 0x5A18C, size: 0x80}, pal: {ref: 0x5A194, size: 0x20}, note: "Se copia a 0x06001400; paleta a 0x05000020."},
+  {id: "pieza2", cat: "Piezas del HUD", name: "Pieza 4 tiles (B)", fn: "func_08062E9C", tiles: {ref: 0x60B98, size: 0x80}, pal: {ref: 0x60C9C, size: 0x20}, note: ""},
+  {id: "pieza3", cat: "Piezas del HUD", name: "Pieza 4 tiles (C)", fn: "func_0806644C", tiles: {ref: 0x5A0A0, size: 0x80}, pal: {ref: 0x5A0A8, size: 0x20}, note: "Se copia a 0x06010200 (OBJ); paleta a 0x05000240."}
+];
+/* Textos de menú: cadenas ASCII sueltas (no son los scripts de diálogo). Cada grupo es la lista de literales del código que
+   apuntan a sus cadenas (sacada de la ROM USA: todo literal alineado que apunta a 0x0E86A8–0x0E8C50, 0x0F1984–0x0F1A34,
+   0x0FB824–0x0FB9A0, 0x0FD940–0x0FD9B0 y 0x104938–0x104958). Por literal, no por dirección: una cadena movida sigue en su grupo. */
+const TEXT_GROUPS = [
+  {name: "Diario, guardar y nombres", refs: [0x3B24, 0x3B28, 0x3B2C, 0x3B30, 0x3B34, 0x3B38, 0x3F30, 0x3F34, 0x3F60, 0x3F68, 0x3F70, 0x3F78, 0x3F94, 0x409C, 0x41D8, 0x4834, 0x4838, 0x483C, 0x4860, 0x4894, 0x4898, 0x489C, 0x4EE8, 0x4EEC, 0x4EF0, 0x54B8, 0x54BC, 0x54C0, 0x54C4, 0x5904, 0x5908, 0x590C, 0x5B34, 0x5F18, 0x66F4, 0x6BDC, 0x7028, 0x702C, 0x7030, 0xE8704, 0xE8708, 0xE870C, 0xE8714, 0xE8718, 0xE871C, 0xE8720, 0xE8724, 0xE8728, 0xE872C, 0xE8730, 0xE8734, 0xE8738, 0xE873C, 0xE8740, 0xE8744, 0xE8748]},
+  {name: "Menú de pausa", refs: [0x3B624, 0xDE920, 0xDE978, 0xDE9D0, 0xDEA44, 0xDEA60, 0xDEAA0, 0xDEB28, 0xDEB44, 0xDEB60, 0xDEB9C, 0xDEC50, 0xDEC6C, 0xDEC88, 0xDECA4, 0xDECD8, 0xDED6C, 0xDEDB0, 0xDEE24, 0xDEE40, 0xDEE80, 0xDEF24, 0xDEF40, 0xDEF5C, 0xDEF9C, 0xDF068, 0xDF084, 0xDF0A0, 0xDF0BC, 0xDF0FC, 0xDF1E4, 0xDF200, 0xDF21C, 0xDF238, 0xDF258, 0xDF298, 0xF1A34, 0xF1A38, 0xF1A3C, 0xF1A40, 0xF1A44, 0xF1A48, 0xF1A4C]},
+  {name: "Granja, animales y ganancias", refs: [0x600A8, 0x600B4, 0x60298, 0x603B8, 0x604E8, 0x60618, 0x60748, 0x60878, 0x62FB0, 0x6313C, 0x6326C, 0x63388, 0x634A4, 0x635C0, 0x636DC, 0x637F4, 0x6390C, 0x64384, 0x64458, 0x64568, 0x646BC, 0x646CC, 0x64824, 0x64948, 0x64A6C, 0x66578, 0x6658C, 0x66774, 0x668A4, 0x669DC, 0x66B0C, 0x66C28, 0x66D48, 0x66E68, 0x66F9C, 0x670D8, 0x67210, 0x683FC, 0x68410, 0x68568, 0x68688, 0x6A484, 0x6A488, 0x6A660, 0x6A7CC]},
+  {name: "Tiendas", refs: [0x79DBC, 0x7B290, 0x7B978, 0x7C02C, 0x7C298, 0x7CBD4, 0x7CE2C, 0xFD9B4, 0xFD9BC, 0xFD9C8, 0xFD9D0]},
+  {name: "Estaciones", refs: [0xE3FA8, 0xE3FD4, 0xE3FDC, 0xE4010]}
+];
+
+let ORIG = null, ROMNAME = "", TAB = "gfx", SEL = null, BLK = new Map(), ASSETS = [], TEXTS = [], LOG = [];
+let VIEW = {zoom: 2, szoom: 3, row: "auto", layers: null, alt: 0, color: 1, crow: 0, layerImp: 0}, UNDO = [];
+
+// ---------------------------------------------------------------- bloques de la ROM
+function ptrAt(rom, ref){
+  const p = rd32(rom, ref), off = p - ROM_BASE;
+  if (p < ROM_BASE || off >= rom.length) throw new Error(`el literal ${hex(ref, 5)} no apunta a la ROM (${hex(p, 8)})`);
+  return off;
+}
+function bankEnd(rom, off){
+  let p = off;
+  for (const sz of SEC) { const c = rd16(rom, p); if (rd16(rom, p + 2) !== 0 || p + 4 + c * sz > rom.length) throw new Error(`banco ilegible en ${hex(off, 6)}`); p += 4 + c * sz; }
+  return p;
+}
+// kind: "lz" (bloque 0x70), "raw" (size bytes), "bank" (banco sin comprimir)
+function block(ref, kind, size){
+  const off = ptrAt(ORIG, ref);
+  if (BLK.has(off)) return BLK.get(off);
+  let data, len;
+  if (kind === "lz") {
+    if (ORIG[off] !== 0x70) throw new Error(`${hex(off + ROM_BASE, 8)} (literal ${hex(ref, 5)}) no es un bloque comprimido 0x70`);
+    data = unpack(ORIG, off); len = unpack.end - off;
+  } else if (kind === "bank") { len = bankEnd(ORIG, off) - off; data = ORIG.slice(off, off + len); }
+  else { len = size; data = ORIG.slice(off, off + size); }
+  const b = {off, kind, len, data, orig: data.slice(), refs: [ref]};
+  BLK.set(off, b); return b;
+}
+const dirty = b => b.data.length !== b.orig.length || b.data.some((v, i) => v !== b.orig[i]);
+
+function parseBank(data){
+  const cnt = [], ofs = []; let p = 0;
+  for (const sz of SEC) { const c = rd16(data, p); if (rd16(data, p + 2) !== 0 || p + 4 + c * sz > data.length) throw new Error("banco ilegible"); cnt.push(c); ofs.push(p + 4); p += 4 + c * sz; }
+  return {cnt, ofs};
+}
+function bankFrames(data, K){
+  const out = [];
+  for (let f = 0; f < K.cnt[1]; f++) {
+    const o = K.ofs[1] + f * 16, oc = rd16(data, o), os = rd16(data, o + 2), ts = rd16(data, o + 6), pc = rd16(data, o + 8), ps = rd16(data, o + 10), parts = [];
+    for (let k = 0; k < oc; k++) {
+      const po = K.ofs[2] + (os + k) * 8; if (os + k >= K.cnt[2]) break;
+      const a0 = rd16(data, po), a1 = rd16(data, po + 2), a2 = rd16(data, po + 4);
+      if ((a0 & 0x300) === 0x200) continue;
+      const wh = OBJ_SZ[(a0 >> 14) + "," + (a1 >> 14)]; if (!wh) continue;
+      let x = a1 & 0x1ff, y = a0 & 0xff; if (x >= 256) x -= 512; if (y >= 128) y -= 256;
+      const aff = a0 & 0x100, pb = (a2 >> 12) & 15;
+      parts.push({x, y, w: wh[0], h: wh[1], t: ts + (a2 & 0x3ff), pal: ps + (pb < pc ? pb : 0), hf: aff ? 0 : (a1 >> 12) & 1, vf: aff ? 0 : (a1 >> 13) & 1});
+    }
+    out.push(parts);
+  }
+  return out;
+}
+
+/* Un «gráfico» para el editor: tiles (vista de bytes 4bpp), paleta y cómo se ve. */
+function buildAsset(def){
+  const A = {def, err: null};
+  try {
+    if (def.tiles !== undefined && def.maps) {   // pantalla
+      A.type = "screen";
+      A.tb = block(def.tiles, "lz"); A.pb = block(def.pal.ref, "raw", def.pal.size); A.palDst = def.pal.dst;
+      A.mb = def.maps.map(r => block(r, "lz"));
+      A.mb.forEach((m, i) => { if (m.data.length % 64) throw new Error(`el mapa ${i} no tiene un tamaño de 32 columnas`); });
+      A.tiles = () => A.tb.data; A.palBytes = () => A.pb.data;
+      A.rows = []; for (let r = A.palDst >> 5; r < (A.palDst + A.pb.data.length) >> 5; r++) A.rows.push(r);
+    } else if (def.tiles) {                    // pieza suelta
+      A.type = "piece";
+      A.tb = block(def.tiles.ref, "raw", def.tiles.size); A.pb = block(def.pal.ref, "raw", def.pal.size); A.palDst = 0;
+      A.tiles = () => A.tb.data; A.palBytes = () => A.pb.data; A.rows = [0];
+    } else {                                   // banco OAM
+      A.type = "bank";
+      A.bb = block(def.ref, def.comp ? "lz" : "bank");
+      A.K = parseBank(A.bb.data); A.frames = bankFrames(A.bb.data, A.K); A.palDst = 0;
+      A.tiles = () => A.bb.data.subarray(A.K.ofs[3], A.K.ofs[3] + A.K.cnt[3] * 32);
+      A.palBytes = () => A.bb.data.subarray(A.K.ofs[4], A.K.ofs[4] + A.K.cnt[4] * 32);
+      A.rows = Array.from({length: A.K.cnt[4]}, (_, i) => i);
+    }
+    A.nt = Math.floor(A.tiles().length / 32);
+    A.tileRow = autoRows(A);
+  } catch (e) { A.err = e.message; }
+  return A;
+}
+function autoRows(A){
+  const r = new Int16Array(A.nt).fill(-1);
+  if (A.type === "screen") {
+    for (const m of A.mb) for (let i = 0; i < m.data.length; i += 2) { const e = rd16(m.data, i), t = e & 0x3ff; if (t < A.nt && r[t] < 0) r[t] = e >> 12; }
+  } else if (A.type === "bank") {
+    for (const parts of A.frames) for (const q of parts) { const n = (q.w >> 3) * (q.h >> 3); for (let k = 0; k < n; k++) if (q.t + k < A.nt && r[q.t + k] < 0) r[q.t + k] = q.pal; }
+  }
+  const def = A.rows[0] || 0;
+  for (let i = 0; i < A.nt; i++) if (r[i] < 0) r[i] = def;
+  return r;
+}
+// color BGR555 de la fila r, índice i (null si esa fila no está en el bloque de paleta)
+function colorOf(A, r, i){
+  const p = A.palBytes(), o = r * 32 + i * 2 - A.palDst;
+  return o >= 0 && o + 1 < p.length ? rd16(p, o) : null;
+}
+const pix = (T, t, x, y) => { const b = T[t * 32 + y * 4 + (x >> 1)]; return x & 1 ? b >> 4 : b & 15; };
+function setPix(T, t, x, y, c){ const o = t * 32 + y * 4 + (x >> 1); T[o] = x & 1 ? (T[o] & 15) | (c << 4) : (T[o] & 0xF0) | c; }
+
+// ---------------------------------------------------------------- carga
+function loadRom(buf, name){
+  const keep = SEL;
+  ORIG = new Uint8Array(buf); ROMNAME = name || "rom.gba"; BLK = new Map(); LOG = []; UNDO = [];
+  const code = String.fromCharCode(...ORIG.subarray(0xAC, 0xB0));
+  $("romst").textContent = `${ROMNAME} · ${(ORIG.length / 1048576).toFixed(ORIG.length % 1048576 ? 1 : 0)} MB · ${code}`;
+  ASSETS = [...SCREENS, ...BANKS, ...PIECES].map(buildAsset);
+  TEXTS = scanTexts(ORIG);
+  if (code !== "A4NE") LOG.push(`Aviso: el código de juego es «${code}», no A4NE (USA): los literales pueden no coincidir.`);
+  SEL = keep && ASSETS.some(a => a.def.id === keep) ? keep : (ASSETS.find(a => !a.err) || {def: {}}).def.id;
+  $("genbtn").disabled = false;
+  renderList(); renderStage(); renderSide();
+}
+
+// ---------------------------------------------------------------- textos
+function refsTo(rom, ptr, lim){ const v = (ptr + ROM_BASE) >>> 0, out = []; for (let o = 0; o + 3 < lim; o += 4) if (rd32(rom, o) === v) out.push(o); return out; }
+function scanTexts(rom){
+  const want = new Map();
+  for (const g of TEXT_GROUPS) for (const r of g.refs) {
+    const t = rd32(rom, r) - ROM_BASE;
+    if (t < 0 || t >= rom.length) continue;
+    if (!want.has(t)) want.set(t, {g, refs: []});
+    want.get(t).refs.push(r);
+  }
+  const starts = [...want.keys()].sort((a, b) => a - b), out = [];
+  starts.forEach((t, k) => {
+    let q = t; while (q < rom.length && rom[q]) q++;
+    const bytes = rom.slice(t, q);
+    if (!bytes.length || bytes.length > 200) return;
+    let ok = 0; for (const c of bytes) if (c === 10 || (c >= 32 && c < 127)) ok++;
+    if (ok < bytes.length * 0.7) return;
+    // capacidad: hasta el siguiente múltiplo de 4, sin pisar bytes no nulos ni otra cadena apuntada
+    let lim = (q + 4) & ~3; const next = starts[k + 1]; if (next !== undefined && next < lim) lim = next;
+    let z = q; while (z + 1 < lim && rom[z + 1] === 0) z++;
+    const w = want.get(t);
+    out.push({g: w.g.name, off: t, refs: w.refs, cap: z - t, orig: bytes, cur: bytes});
+  });
+  return out;
+}
+function decodeTxt(b){ let s = ""; for (const c of b) s += c === 10 ? "\\n" : c === 0x5C || c === 0x7B || c < 32 || c > 126 ? "{" + c.toString(16).toUpperCase().padStart(2, "0") + "}" : String.fromCharCode(c); return s; }
+function encodeTxt(s){
+  const out = [];
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "\\" && s[i + 1] === "n") { out.push(10); i++; continue; }
+    if (s[i] === "{") { const m = /^\{([0-9A-Fa-f]{2})\}/.exec(s.slice(i)); if (!m || m[1] === "00") throw new Error(`código «${s.slice(i, i + 4)}» no válido (usa {HH}, no {00})`); out.push(parseInt(m[1], 16)); i += 3; continue; }
+    const c = s.charCodeAt(i); if (c < 32 || c > 126) throw new Error(`carácter «${s[i]}» fuera de ASCII (usa {HH})`); out.push(c);
+  }
+  return Uint8Array.from(out);
+}
+
+// ---------------------------------------------------------------- lista
+function renderList(){
+  const L = $("list"); if (!ORIG) return;
+  if (TAB === "txt") {
+    const groups = [...new Set(TEXTS.map(t => t.g))];
+    L.innerHTML = groups.map(g => { const n = TEXTS.filter(t => t.g === g), e = n.filter(t => !eq(t.cur, t.orig)).length;
+      return `<button class="item${SEL === "txt:" + g ? " on" : ""}" data-sel="txt:${esc(g)}"><span>${esc(g)}</span><small${e ? ' class="ed"' : ""}>${e ? e + " ✎ / " : ""}${n.length}</small></button>`; }).join("");
+  } else {
+    let cat = "", h = "";
+    for (const A of ASSETS) {
+      if (A.def.cat !== cat) { cat = A.def.cat; h += `<div class="grp">${esc(cat)}</div>`; }
+      const ed = !A.err && assetBlocks(A).some(dirty);
+      h += `<button class="item${SEL === A.def.id ? " on" : ""}${A.err ? " err" : ""}" data-sel="${A.def.id}" title="${esc(A.err || A.def.fn)}"><span>${esc(A.def.name)}</span><small${ed ? ' class="ed"' : ""}>${A.err ? "error" : ed ? "✎" : A.nt + " t"}</small></button>`;
+    }
+    L.innerHTML = h;
+  }
+  L.querySelectorAll("[data-sel]").forEach(b => b.onclick = () => { SEL = b.dataset.sel; VIEW.layers = null; VIEW.alt = 0; UNDO = []; renderList(); renderStage(); renderSide(); });
+}
+const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const cur = () => ASSETS.find(a => a.def.id === SEL);
+const assetBlocks = A => A.type === "screen" ? [A.tb, A.pb, ...A.mb] : A.type === "bank" ? [A.bb] : [A.tb, A.pb];
+
+// ---------------------------------------------------------------- vista
+function renderStage(){
+  const S = $("stage");
+  if (!ORIG) return;
+  if (TAB === "txt") return renderTexts();
+  const A = cur();
+  if (!A) { S.innerHTML = `<div class="empty">Elige un gráfico de la lista.</div>`; return; }
+  if (A.err) { S.innerHTML = `<h2>${esc(A.def.name)}</h2><p class="bad">No se pudo leer: ${esc(A.err)}</p>`; return; }
+  const where = assetBlocks(A).map(b => `${b.kind === "lz" ? "0x70 " : ""}${hex(b.off + ROM_BASE, 8)}`).join(" · ");
+  let h = `<h2>${esc(A.def.name)}</h2><div class="meta">${esc(A.def.fn)} · ${where}</div>${A.def.note ? `<p class="note">${esc(A.def.note)}</p>` : ""}`;
+  if (A.type === "screen") {
+    const n = A.mb.length;
+    if (!VIEW.layers) VIEW.layers = A.mb.map(() => true);
+    h += `<h3>Pantalla</h3><div class="bar">` + (A.def.alt
+      ? `<label>Escena <select id="altsel">${A.mb.map((m, i) => `<option value="${i}"${i === VIEW.alt ? " selected" : ""}>${i} · ${hex(m.off + ROM_BASE, 8)}</option>`).join("")}</select></label>`
+      : A.mb.map((m, i) => `<label><input type="checkbox" data-ly="${i}"${VIEW.layers[i] ? " checked" : ""}> capa ${i} <span class="meta">(32×${m.data.length / 64} · ${hex(m.off + ROM_BASE, 8)})</span></label>`).join(""))
+      + `<label>Zoom <select id="zsel">${[1, 2, 3, 4].map(z => `<option${z === VIEW.zoom ? " selected" : ""}>${z}</option>`).join("")}</select></label></div>
+      <p class="note">Pinta directamente sobre la pantalla: cada clic va al tile que dibuja ese píxel (respeta los espejados). Clic derecho = cuentagotas. ${n > 1 && !A.def.alt ? "Pinta sobre la capa visible de más delante." : ""}</p>
+      <div class="cv"><canvas id="scr"></canvas></div>`;
+  } else if (A.type === "bank") {
+    h += `<h3>Fotogramas (${A.frames.length})</h3><div class="bar"><label>Zoom <select id="zsel">${[1, 2, 3].map(z => `<option${z === VIEW.zoom ? " selected" : ""}>${z}</option>`).join("")}</select></label></div>
+      <div class="cv"><canvas id="scr"></canvas></div>`;
+  }
+  h += `<h3>Tiles (${A.nt})</h3><div class="bar"><label>Paleta <select id="rsel"><option value="auto">la que usa cada tile</option>${A.rows.map(r => `<option value="${r}"${String(r) === String(VIEW.row) ? " selected" : ""}>fila ${r}</option>`).join("")}</select></label>
+    <label>Zoom <select id="szsel">${[2, 3, 4, 6].map(z => `<option${z === VIEW.szoom ? " selected" : ""}>${z}</option>`).join("")}</select></label>
+    <button class="btn sm" id="undo" ${UNDO.length ? "" : "disabled"}>Deshacer (Ctrl+Z)</button></div>
+    <p class="note">16 tiles por fila. Clic = pintar con el color elegido, clic derecho = cuentagotas.</p>
+    <div class="cv"><canvas id="sheet"></canvas></div>`;
+  S.innerHTML = h;
+  S.querySelectorAll("[data-ly]").forEach(c => c.onchange = () => { VIEW.layers[+c.dataset.ly] = c.checked; drawAll(); });
+  if ($("altsel")) $("altsel").onchange = e => { VIEW.alt = +e.target.value; drawAll(); };
+  if ($("zsel")) $("zsel").onchange = e => { VIEW.zoom = +e.target.value; drawAll(); };
+  $("rsel").onchange = e => { VIEW.row = e.target.value; drawAll(); };
+  $("szsel").onchange = e => { VIEW.szoom = +e.target.value; drawAll(); };
+  $("undo").onclick = undo;
+  hookPaint($("sheet"), "sheet"); if ($("scr") && A.type === "screen") hookPaint($("scr"), "scr");
+  drawAll();
+}
+function drawAll(){
+  const A = cur(); if (!A || A.err || TAB !== "gfx") return;
+  if ($("scr")) A.type === "screen" ? drawScreen(A) : drawFrames(A);
+  drawSheet(A);
+  if ($("undo")) $("undo").disabled = !UNDO.length;
+}
+function putRGB(img, o, c){ if (c === null) { img[o] = 255; img[o + 1] = 0; img[o + 2] = 255; } else { const [r, g, b] = rgbOf(c); img[o] = r; img[o + 1] = g; img[o + 2] = b; } img[o + 3] = 255; }
+function visLayers(A){ return A.def.alt ? [VIEW.alt] : A.mb.map((_, i) => i).filter(i => VIEW.layers[i]); }
+// píxel de pantalla → {t, x, y, row} de la capa visible de más delante con color ≠ 0 (o la de más atrás)
+function screenHit(A, X, Y){
+  const T = A.tiles(), L = visLayers(A); let last = null;
+  for (let k = L.length - 1; k >= 0; k--) {
+    const m = A.mb[L[k]].data, cx = X >> 3, cy = Y >> 3, mi = cy * 32 + cx;
+    if (mi * 2 >= m.length) continue;
+    const e = rd16(m, mi * 2), t = e & 0x3ff, x = e & 0x400 ? 7 - (X & 7) : X & 7, y = e & 0x800 ? 7 - (Y & 7) : Y & 7;
+    if (t >= A.nt) continue;
+    const hit = {t, x, y, row: e >> 12};
+    if (pix(T, t, x, y)) return hit;
+    last = hit;
+  }
+  return last;
+}
+function drawScreen(A){
+  const c = $("scr"), L = visLayers(A), H = Math.max(...A.mb.map(m => m.data.length / 64)) * 8, W = 256;
+  c.width = W; c.height = H; c.style.width = W * VIEW.zoom + "px"; c.style.height = H * VIEW.zoom + "px";
+  const ctx = c.getContext("2d"), im = ctx.createImageData(W, H), d = im.data, T = A.tiles(), back = colorOf(A, A.palDst >> 5, 0);
+  for (let o = 0; o < d.length; o += 4) putRGB(d, o, back === null ? 0 : back);
+  for (const li of L) {
+    const m = A.mb[li].data, rows = m.length / 64;
+    for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < 32; cx++) {
+      const e = rd16(m, (cy * 32 + cx) * 2), t = e & 0x3ff, row = e >> 12; if (t >= A.nt) continue;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const v = pix(T, t, e & 0x400 ? 7 - x : x, e & 0x800 ? 7 - y : y); if (!v) continue;
+        putRGB(d, ((cy * 8 + y) * W + cx * 8 + x) * 4, colorOf(A, row, v));
+      }
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+}
+function drawFrames(A){
+  const c = $("scr"), cell = 72, cols = 10, n = A.frames.length, rows = Math.ceil(n / cols), W = cols * cell, H = rows * cell;
+  c.width = W; c.height = H; c.style.width = W * VIEW.zoom + "px"; c.style.height = H * VIEW.zoom + "px";
+  const ctx = c.getContext("2d"), im = ctx.createImageData(W, H), d = im.data, T = A.tiles();
+  A.frames.forEach((parts, f) => {
+    const bx = (f % cols) * cell, by = Math.floor(f / cols) * cell;
+    for (let k = parts.length - 1; k >= 0; k--) {
+      const q = parts[k];
+      for (let py = 0; py < q.h; py++) for (let px = 0; px < q.w; px++) {
+        const sx = q.hf ? q.w - 1 - px : px, sy = q.vf ? q.h - 1 - py : py, tt = q.t + (sy >> 3) * (q.w >> 3) + (sx >> 3);
+        if (tt >= A.nt) continue;
+        const v = pix(T, tt, sx & 7, sy & 7); if (!v) continue;
+        const X = cell / 2 + q.x + px, Y = cell / 2 + q.y + py; if (X < 0 || Y < 0 || X >= cell || Y >= cell) continue;
+        putRGB(d, ((by + Y) * W + bx + X) * 4, colorOf(A, q.pal, v));
+      }
+    }
+  });
+  ctx.putImageData(im, 0, 0);
+  ctx.fillStyle = "#8b9298"; ctx.font = "9px monospace"; A.frames.forEach((_, f) => ctx.fillText(f, (f % cols) * cell + 2, Math.floor(f / cols) * cell + 9));
+}
+const sheetRow = (A, t) => VIEW.row === "auto" ? A.tileRow[t] : +VIEW.row;
+function drawSheet(A){
+  const c = $("sheet"), cols = 16, rows = Math.ceil(A.nt / cols), W = cols * 8, H = Math.max(1, rows) * 8;
+  c.width = W; c.height = H; c.style.width = W * VIEW.szoom + "px"; c.style.height = H * VIEW.szoom + "px";
+  const ctx = c.getContext("2d"), im = ctx.createImageData(W, H), d = im.data, T = A.tiles();
+  for (let t = 0; t < A.nt; t++) { const row = sheetRow(A, t), bx = (t % cols) * 8, by = Math.floor(t / cols) * 8;
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = pix(T, t, x, y), o = ((by + y) * W + bx + x) * 4; if (v) putRGB(d, o, colorOf(A, row, v)); } }
+  ctx.putImageData(im, 0, 0);
+}
+
+// ---------------------------------------------------------------- pintar
+function snapshot(blocks){ UNDO.push(blocks.map(b => [b, b.data.slice()])); if (UNDO.length > 60) UNDO.shift(); }
+function undo(){ const s = UNDO.pop(); if (!s) return; for (const [b, d] of s) b.data.set(d); afterEdit(); }
+function tileBlock(A){ return A.type === "bank" ? A.bb : A.tb; }
+let PAINTING = false;
+window.addEventListener("mouseup", () => { if (PAINTING) { PAINTING = false; afterEdit(); } });
+function hookPaint(c, kind){
+  const at = e => { const r = c.getBoundingClientRect(), z = kind === "sheet" ? VIEW.szoom : VIEW.zoom; return [Math.floor((e.clientX - r.left) / z), Math.floor((e.clientY - r.top) / z)]; };
+  const hitOf = (X, Y) => {
+    const A = cur();
+    if (kind === "scr") return screenHit(A, X, Y);
+    const t = (Y >> 3) * 16 + (X >> 3); if (X < 0 || X >= 128 || t >= A.nt) return null;
+    return {t, x: X & 7, y: Y & 7, row: sheetRow(A, t)};
+  };
+  const paint = e => { const A = cur(), h = hitOf(...at(e)); if (!h) return; setPix(A.tiles(), h.t, h.x, h.y, VIEW.color); drawAll(); };
+  c.oncontextmenu = e => e.preventDefault();
+  c.onmousedown = e => {
+    const A = cur(), h = hitOf(...at(e)); if (!h) return;
+    if (e.button === 2 || e.altKey) { VIEW.color = pix(A.tiles(), h.t, h.x, h.y); VIEW.crow = h.row; renderSide(); return; }
+    snapshot([tileBlock(A)]); PAINTING = true; paint(e);
+  };
+  c.onmousemove = e => { if (PAINTING) paint(e); };
+}
+function afterEdit(){ drawAll(); renderList(); renderSide(); }
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "z" && TAB === "gfx" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); undo(); } });
+
+// ---------------------------------------------------------------- panel derecho
+function renderSide(){
+  const S = $("side"); if (!ORIG) { S.innerHTML = ""; return; }
+  if (TAB === "txt") { S.innerHTML = `<div class="side"><h4>Textos de menú</h4><p>Son cadenas ASCII sueltas que el código apunta directamente (no los scripts de diálogo: esos se editan en «Textos, NPC y retratos»).</p><p><code>\\n</code> = salto de línea, <code>{HH}</code> = byte en hexadecimal (símbolos especiales).</p><p>Si el texto nuevo cabe en su hueco se escribe en el sitio; si no, va al espacio libre y se repuntan todos los literales que lo apuntan (borde rojo). Un texto con varios literales cambia en todos los menús que lo usan.</p></div>${logBox()}`; hookLog(); return; }
+  const A = cur(); if (!A || A.err) { S.innerHTML = logBox(); hookLog(); return; }
+  const sel = colorOf(A, VIEW.crow, VIEW.color);
+  let h = `<div class="side"><h4>Paleta</h4><p>Clic = color para pintar. El color 0 es transparente.</p>`;
+  for (const r of A.rows) {
+    h += `<div class="pal"><b>${r}</b>`;
+    for (let i = 0; i < 16; i++) { const c = colorOf(A, r, i), [R, G, B] = rgbOf(c || 0);
+      h += `<i data-r="${r}" data-i="${i}" class="${r === VIEW.crow && i === VIEW.color ? "on" : ""}${i ? "" : " t"}" style="background-color:rgb(${R},${G},${B})" title="fila ${r} · color ${i}"></i>`; }
+    h += `</div>`;
+  }
+  const [R, G, B] = rgbOf(sel || 0);
+  h += `<div class="cur">Fila ${VIEW.crow}, color ${VIEW.color} <input type="color" id="cpick" value="#${[R, G, B].map(v => v.toString(16).padStart(2, "0")).join("")}" ${sel === null ? "disabled" : ""}> <span class="meta">${sel === null ? "—" : hex(sel, 4)}</span></div></div>`;
+  h += `<div class="side"><h4>PNG</h4>
+    <button class="btn" id="expsheet">Exportar hoja de tiles</button> ${A.type !== "piece" ? `<button class="btn" id="expscr">Exportar ${A.type === "screen" ? "pantalla" : "fotogramas"}</button>` : ""}
+    <label>Importar hoja de tiles (mismo formato que la exportada: 16 tiles por fila)</label><input type="file" id="impsheet" accept="image/png">
+    ${A.type === "screen" ? `<label>Importar sobre una capa (256 px de ancho; cada celda reescribe el tile que usa)</label>
+      <select id="impl">${A.mb.map((m, i) => `<option value="${i}"${i === VIEW.layerImp ? " selected" : ""}>capa ${i} · ${hex(m.off + ROM_BASE, 8)}</option>`).join("")}</select>
+      <input type="file" id="impscr" accept="image/png">` : ""}
+    <label>Colores al importar</label><select id="impmode"><option value="pal">ajustar a la paleta actual</option><option value="new">paleta nueva desde el PNG (fila elegida)</option></select>
+    <p>Los píxeles transparentes van al color 0. Con «paleta nueva» se sacan hasta 15 colores y se escriben en la fila ${VIEW.crow}; todos los tiles importados pasan a usarla (solo en la hoja: en la pantalla cada celda conserva su fila).</p>
+    <div class="msg" id="impmsg"></div></div>
+    <div class="side"><h4>Cambios de este gráfico</h4><button class="btn" id="discard">Descartar cambios</button></div>`;
+  S.innerHTML = h + logBox();
+  S.querySelectorAll(".pal i").forEach(i => i.onclick = () => { VIEW.crow = +i.dataset.r; VIEW.color = +i.dataset.i; renderSide(); });
+  $("cpick").oninput = e => {
+    const v = e.target.value, c = bgrOf(parseInt(v.slice(1, 3), 16), parseInt(v.slice(3, 5), 16), parseInt(v.slice(5, 7), 16));
+    const pb = A.type === "bank" ? A.bb : A.pb, P = A.palBytes(), o = VIEW.crow * 32 + VIEW.color * 2 - A.palDst;
+    if (o < 0 || o + 1 >= P.length) return;
+    if (!e.target._snap) { snapshot([pb]); e.target._snap = true; }
+    wr16(P, o, c); drawAll();
+  };
+  $("cpick").onchange = e => { e.target._snap = false; afterEdit(); };
+  $("expsheet").onclick = () => downloadCanvas($("sheet"), `${A.def.id}_tiles.png`);
+  if ($("expscr")) $("expscr").onclick = () => downloadCanvas($("scr"), `${A.def.id}_${A.type === "screen" ? "pantalla" : "fotogramas"}.png`);
+  $("impsheet").onchange = e => importPng(e, "sheet");
+  if ($("impscr")) { $("impl").onchange = e => VIEW.layerImp = +e.target.value; $("impscr").onchange = e => importPng(e, "scr"); }
+  $("discard").onclick = () => { snapshot(assetBlocks(A)); for (const b of assetBlocks(A)) b.data.set(b.orig); afterEdit(); };
+  hookLog();
+}
+function logBox(){
+  const ed = [...BLK.values()].filter(dirty).length, tx = TEXTS.filter(t => !eq(t.cur, t.orig)).length;
+  return `<div class="side"><h4>Pendiente de inyectar</h4><p>${ed} bloque(s) gráficos y ${tx} texto(s) modificados.</p>${LOG.map(l => `<p class="warn">${esc(l)}</p>`).join("")}</div>`;
+}
+function hookLog(){}
+function downloadCanvas(c, name){ c.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name; a.click(); }); }
+
+// ---------------------------------------------------------------- importar PNG
+function loadImage(file){
+  return new Promise((ok, ko) => { const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = im.width; c.height = im.height; const x = c.getContext("2d"); x.drawImage(im, 0, 0); ok(x.getImageData(0, 0, im.width, im.height)); }; im.onerror = () => ko(new Error("no es una imagen válida")); im.src = URL.createObjectURL(file); });
+}
+function nearest(A, row, r, g, b){
+  let best = 1, bd = 1e9;
+  for (let i = 1; i < 16; i++) { const c = colorOf(A, row, i); if (c === null) continue; const [R, G, B] = rgbOf(c), d = (R - r) ** 2 + (G - g) ** 2 + (B - b) ** 2; if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+// hasta 15 colores (corte por la mediana sobre los colores opacos, ya reducidos a 15 bits)
+function quantize(img){
+  const cnt = new Map();
+  for (let i = 0; i < img.data.length; i += 4) if (img.data[i + 3] >= 128) { const c = bgrOf(img.data[i], img.data[i + 1], img.data[i + 2]); cnt.set(c, (cnt.get(c) || 0) + 1); }
+  let boxes = [[...cnt.keys()]];
+  while (boxes.length < 15) {
+    boxes.sort((a, b) => b.length - a.length); const bx = boxes[0]; if (bx.length < 2) break;
+    const ch = [0, 5, 10].map(s => { const v = bx.map(c => (c >> s) & 31); return [Math.max(...v) - Math.min(...v), s]; }).sort((a, b) => b[0] - a[0])[0][1];
+    bx.sort((a, b) => ((a >> ch) & 31) - ((b >> ch) & 31)); boxes[0] = bx.slice(0, bx.length >> 1); boxes.push(bx.slice(bx.length >> 1));
+  }
+  return boxes.filter(b => b.length).map(bx => { let w = 0, s = [0, 0, 0]; for (const c of bx) { const n = cnt.get(c); w += n; s[0] += (c & 31) * n; s[1] += ((c >> 5) & 31) * n; s[2] += ((c >> 10) & 31) * n; } return Math.round(s[0] / w) | (Math.round(s[1] / w) << 5) | (Math.round(s[2] / w) << 10); });
+}
+async function importPng(e, where){
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const A = cur(), msg = $("impmsg");
+  try {
+    const img = await loadImage(f), T = A.tiles(), mode = $("impmode").value;
+    const pb = A.type === "bank" ? A.bb : A.pb;
+    snapshot([tileBlock(A), pb]);
+    let forced = null;
+    if (mode === "new") {
+      const cols = quantize(img), P = A.palBytes(), o = VIEW.crow * 32 - A.palDst;
+      if (o < 0 || o + 32 > P.length) throw new Error(`la fila ${VIEW.crow} no está en el bloque de paleta`);
+      cols.forEach((c, i) => wr16(P, o + (i + 1) * 2, c)); forced = VIEW.crow;
+    }
+    const px = (X, Y) => { const o = (Y * img.width + X) * 4, d = img.data; return d[o + 3] < 128 ? null : [d[o], d[o + 1], d[o + 2]]; };
+    let n = 0, clash = 0;
+    if (where === "sheet") {
+      if (img.width % 8 || img.height % 8) throw new Error(`la imagen mide ${img.width}×${img.height}: debe ser múltiplo de 8`);
+      const cols = img.width / 8;
+      for (let ty = 0; ty < img.height / 8; ty++) for (let tx = 0; tx < cols; tx++) {
+        const t = ty * 16 + tx; if (tx >= 16 || t >= A.nt) continue;
+        const row = forced !== null ? forced : sheetRow(A, t);
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const p = px(tx * 8 + x, ty * 8 + y); setPix(T, t, x, y, p ? nearest(A, row, ...p) : 0); }
+        n++;
+      }
+      msg.innerHTML = `<span class="ok">✓ ${n} tiles importados.</span>${img.width > 128 ? `<br><span class="warn">La hoja tiene más de 16 columnas: se ignoran las sobrantes.</span>` : ""}`;
+    } else {
+      const m = A.mb[VIEW.layerImp].data, rows = m.length / 64, seen = new Map();
+      if (img.width < 256 || img.height < rows * 8) throw new Error(`la capa ocupa 256×${rows * 8} px; la imagen mide ${img.width}×${img.height}`);
+      for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < 32; cx++) {
+        const e = rd16(m, (cy * 32 + cx) * 2), t = e & 0x3ff, row = e >> 12; if (t >= A.nt || t === 0) continue;
+        const tile = new Uint8Array(64);
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const p = px(cx * 8 + x, cy * 8 + y); tile[(e & 0x800 ? 7 - y : y) * 8 + (e & 0x400 ? 7 - x : x)] = p ? nearest(A, row, ...p) : 0; }
+        const key = tile.join(","); if (seen.has(t)) { if (seen.get(t) !== key) clash++; continue; }
+        seen.set(t, key); for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) setPix(T, t, x, y, tile[y * 8 + x]); n++;
+      }
+      msg.innerHTML = `<span class="ok">✓ ${n} tiles reescritos desde la capa ${VIEW.layerImp}.</span>${clash ? `<br><span class="warn">${clash} celdas querían otro dibujo para un tile que ya usaba otra celda (tiles compartidos o el tile 0, que se deja): manda la primera.</span>` : ""}`;
+    }
+    afterEdit(); $("impmsg").innerHTML = msg.innerHTML;
+  } catch (err) { msg.innerHTML = `<span class="bad">✗ ${esc(err.message)}</span>`; }
+}
+
+// ---------------------------------------------------------------- textos (vista)
+function renderTexts(){
+  const S = $("stage"), g = (SEL || "").startsWith("txt:") ? SEL.slice(4) : TEXTS.length ? TEXTS[0].g : "";
+  const list = TEXTS.filter(t => t.g === g);
+  S.innerHTML = `<h2>${esc(g)}</h2><p class="note">${list.length} cadenas apuntadas desde el código. «hueco» = bytes que caben sin mover la cadena.</p>
+    <table class="tx"><tbody>${list.map(t => `<tr><td class="a">${hex(t.off + ROM_BASE, 8)}<br>${t.refs.length} lit. · hueco ${t.cap}</td><td><input data-off="${t.off}" value="${esc(decodeTxt(t.cur))}" spellcheck="false"></td></tr>`).join("")}</tbody></table>
+    <div class="msg" id="txmsg"></div>`;
+  S.querySelectorAll("input[data-off]").forEach(inp => {
+    const t = TEXTS.find(x => x.off === +inp.dataset.off), mark = () => { inp.classList.toggle("chg", !eq(t.cur, t.orig)); inp.classList.toggle("mv", t.cur.length > t.cap); };
+    mark();
+    inp.oninput = () => { try { t.cur = encodeTxt(inp.value); inp.title = ""; $("txmsg").textContent = ""; } catch (e) { $("txmsg").innerHTML = `<span class="bad">✗ ${esc(hex(t.off + ROM_BASE, 8))}: ${esc(e.message)}</span>`; } mark(); };
+    inp.onchange = () => { renderList(); renderSide(); };
+  });
+}
+
+// ---------------------------------------------------------------- generar ROM
+// espacio libre: tras el último byte que no es 0x00 ni 0xFF (alineado a 4, con 16 bytes de margen)
+const freeStart = rom => { let e = rom.length; while (e && (rom[e - 1] === 0xFF || rom[e - 1] === 0x00)) e--; return ((e + 3) & ~3) + 16; };
+function build(){
+  let rom = ORIG.slice(), free = freeStart(rom), wrote = false;
+  const out = [], bad = [], placed = [];
+  const room = n => { if (free + n + 8 > rom.length) { const big = new Uint8Array(Math.min(0x2000000, (free + n + 8 + 0xFFFFF) & ~0xFFFFF)).fill(0xFF); if (big.length < free + n + 8) throw new Error("no cabe ni ampliando la ROM a 32 MB"); big.set(rom); rom = big; } };
+  const append = bytes => { room(bytes.length); const at = free; rom.set(bytes, at); free = (at + bytes.length + 3) & ~3; wrote = true; return at; };
+  const repoint = (oldOff, newOff) => { const r = refsTo(ORIG, oldOff, ORIG.length); for (const o of r) wr32(rom, o, newOff + ROM_BASE); return r; };
+  for (const b of BLK.values()) {
+    if (!dirty(b)) continue;
+    const bytes = b.kind === "lz" ? packPopuri(b.data) : b.data;
+    if (b.kind !== "lz") { rom.set(bytes, b.off); placed.push([b, b.off]); out.push(`${hex(b.off + ROM_BASE, 8)}: ${bytes.length} bytes reescritos en su sitio`); continue; }
+    if (bytes.length <= b.len) { rom.set(bytes, b.off); placed.push([b, b.off]); out.push(`${hex(b.off + ROM_BASE, 8)}: recomprimido (${bytes.length} de ${b.len} bytes), en su sitio`); continue; }
+    const at = append(bytes), r = repoint(b.off, at);
+    if (!r.length) bad.push(`${hex(b.off + ROM_BASE, 8)}: no se encontró ningún literal que lo apunte`);
+    placed.push([b, at]); out.push(`${hex(b.off + ROM_BASE, 8)} → ${hex(at + ROM_BASE, 8)}: recomprimido (${bytes.length} > ${b.len} bytes), ${r.length} literal(es) repuntados (${r.map(o => hex(o, 5)).join(", ")})`);
+  }
+  for (const t of TEXTS) {
+    if (eq(t.cur, t.orig)) continue;
+    if (t.cur.length <= t.cap) { rom.set(t.cur, t.off); rom.fill(0, t.off + t.cur.length, t.off + t.cap + 1); out.push(`Texto ${hex(t.off + ROM_BASE, 8)}: «${decodeTxt(t.cur)}» en su sitio`); t.at = t.off; continue; }
+    const z = new Uint8Array(t.cur.length + 1); z.set(t.cur); const at = append(z);
+    for (const o of t.refs) wr32(rom, o, at + ROM_BASE);
+    t.at = at; out.push(`Texto ${hex(t.off + ROM_BASE, 8)} → ${hex(at + ROM_BASE, 8)}: «${decodeTxt(t.cur)}», ${t.refs.length} literal(es) repuntados`);
+  }
+  if (wrote) { room(4); rom.set(GUARD, free); }
+  // relectura: desde los literales del código, como lo hará el juego
+  for (const [b, at] of placed) {
+    const ref = b.refs[0], p = rd32(rom, ref) - ROM_BASE;
+    if (p !== at) { bad.push(`${hex(ref, 5)} apunta a ${hex(p + ROM_BASE, 8)}, no a ${hex(at + ROM_BASE, 8)}`); continue; }
+    let back;
+    try { back = b.kind === "lz" ? unpack(rom, p) : rom.slice(p, p + b.data.length); } catch (e) { bad.push(`${hex(p + ROM_BASE, 8)}: ${e.message}`); continue; }
+    if (!eq(back, b.data)) bad.push(`${hex(p + ROM_BASE, 8)}: al releerlo no coincide con lo editado`);
+  }
+  for (const t of TEXTS) if (t.at !== undefined) {
+    for (const o of t.refs) { const p = rd32(rom, o) - ROM_BASE; let q = p; while (rom[q]) q++; if (!eq(rom.slice(p, q), t.cur)) { bad.push(`Texto ${hex(t.off + ROM_BASE, 8)}: el literal ${hex(o, 5)} no relee «${decodeTxt(t.cur)}»`); break; } }
+    delete t.at;
+  }
+  for (let i = 0xA0; i < 0xC0; i++) if (rom[i] !== ORIG[i]) { bad.push("La cabecera de la ROM cambió"); break; }
+  if (!bad.length) out.push(`Releídos ${placed.length} bloque(s) desde sus literales: idénticos a lo editado.`);
+  return {rom, out, bad};
+}
+$("genbtn").onclick = () => {
+  const dl = $("gendlg"), body = $("genbody"), foot = $("genfoot");
+  let r; try { r = build(); } catch (e) { r = {rom: null, out: [], bad: [e.message]}; }
+  const {rom, out, bad} = r;
+  body.innerHTML = `<p>${out.length ? "Cambios:" : "Sin cambios: la ROM saldrá igual."}</p><ul>${out.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+    ${bad.length ? `<ul>${bad.map(x => `<li class="bad">${esc(x)}</li>`).join("")}</ul><p class="bad">✗ La verificación falló: no se descarga.</p>`
+      : `<p class="ok">✓ Verificación correcta. ROM de ${(rom.length / 1048576).toFixed(rom.length % 1048576 ? 2 : 0)} MB${rom.length > ORIG.length ? " (ampliada)" : ""}.</p>`}`;
+  foot.innerHTML = "";
+  if (!bad.length) {
+    const name = ROMNAME.replace(/\.gba$/i, "").replace(/ \(interfaz\)$/, "") + " (interfaz).gba";
+    const b = document.createElement("button"); b.className = "btn primary"; b.textContent = "Descargar ROM (.gba)";
+    b.onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([rom])); a.download = name; a.click(); };
+    foot.appendChild(b);
+    if (FomtHub.inSuite) { FomtHub.publish(rom, name); const s = document.createElement("span"); s.className = "ok"; s.style.alignSelf = "center"; s.textContent = "Enviada a la suite como ROM de trabajo."; foot.prepend(s); }
+    loadRom(rom, name);   // seguir editando sobre la ROM generada (releída desde cero)
+  }
+  dl.showModal();
+};
+$("genclose").onclick = () => $("gendlg").close();
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  TAB = b.dataset.tab; document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+  SEL = TAB === "txt" ? (TEXTS.length ? "txt:" + TEXTS[0].g : null) : (ASSETS.find(a => !a.err) || {def: {}}).def.id;
+  renderList(); renderStage(); renderSide();
+});
+$("rom-in").onchange = async e => { const f = e.target.files[0]; if (f) loadRom(await f.arrayBuffer(), f.name); e.target.value = ""; };
+FomtHub.onRom((b, name) => loadRom(b, name));
+</script>
+</body>
+</html>
